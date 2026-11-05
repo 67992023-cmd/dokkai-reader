@@ -26,18 +26,47 @@
     <div id="libList"></div>
   </main>
   <div class="bottom-bar">
-    <button type="button" class="btn primary wide" id="openScan">Scan your Passage</button>
-    <div class="sample-bar">
-      <span class="sample-title">Sample passage for study N1–N5</span>
-      <div class="sample-pills" role="group" aria-label="Sample passages for study">
-        <button type="button" class="pill" data-lvl="N5">N5</button>
-        <button type="button" class="pill" data-lvl="N4">N4</button>
-        <button type="button" class="pill" data-lvl="N3">N3</button>
-        <button type="button" class="pill" data-lvl="N2">N2</button>
-        <button type="button" class="pill" data-lvl="N1">N1</button>
-      </div>
+    <div class="bottom-bar-inner">
+      <button type="button" class="btn primary wide" id="openScan">Scan your Passage</button>
+      <button type="button" class="btn dark wide" id="openSamples">Study Passages</button>
     </div>
   </div>
+</div>
+
+<!-- Study Passages -->
+<div id="samplesView" class="view" hidden>
+  <header class="nav">
+    <div class="nav-inner">
+      <button type="button" class="link back" id="samplesBack">
+        <svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Library
+      </button>
+      <span class="nav-title" id="samplesNavTitle">Study Passages</span>
+      <span></span>
+    </div>
+  </header>
+  <main class="content">
+    <h1 class="large-title" id="samplesLargeTitle">Study Passages</h1>
+    <p class="section-desc">Authentic reading passages with furigana, vocabulary meanings, sentence translations, and JLPT practice quizzes.</p>
+
+    <div class="level-seg-wrap" role="region" aria-label="Select JLPT level">
+      <div class="level-seg" role="tablist" aria-label="Level tabs">
+        <button type="button" class="level-tab active" role="tab" aria-selected="true" data-lvl="Beginner">Beginner</button>
+        <button type="button" class="level-tab" role="tab" aria-selected="false" data-lvl="N5">N5</button>
+        <button type="button" class="level-tab" role="tab" aria-selected="false" data-lvl="N4">N4</button>
+        <button type="button" class="level-tab" role="tab" aria-selected="false" data-lvl="N3">N3</button>
+        <button type="button" class="level-tab" role="tab" aria-selected="false" data-lvl="N2">N2</button>
+        <button type="button" class="level-tab" role="tab" aria-selected="false" data-lvl="N1">N1</button>
+      </div>
+    </div>
+
+    <div class="sample-level-meta">
+      <h2 class="section-title" id="samplesLevelHeader">Beginner Passages</h2>
+      <span class="sample-count" id="samplesLevelCount">5 passages</span>
+    </div>
+
+    <div id="sampleList"></div>
+  </main>
 </div>
 
 <!-- Reader -->
@@ -46,7 +75,7 @@
     <div class="nav-inner">
       <button type="button" class="link back" id="back">
         <svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Library
+        <span id="backLabel">Library</span>
       </button>
       <span class="nav-title" id="navTitle" lang="ja" aria-hidden="true"></span>
       <span></span>

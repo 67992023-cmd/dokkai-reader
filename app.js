@@ -392,48 +392,154 @@ function normPassage(o, lang) {
 }
 
 function makeSampleFromData(data) {
-  const { S, Q, paragraphs = [0], title, level } = data;
-  const sentences = S.map(([toks, tr], i) => ({
-    newParagraph: paragraphs.includes(i),
-    translation: tr,
-    tokens: [
-      ...toks.split(';').map(k => {
-        const f = k.split('/');
-        return f.length < 3 ? { t: f[0], r: '', m: '' } : { t: f[0], r: f[1], m: f[2] };
-      }),
-      { t: '。', r: '', m: '' },
-    ],
+  const { S, Q, paragraphs = [0], title, level, id, summary } = data;
+  const sentences = S.map(([toks, tr], i) => {
+    const rawTokens = toks.split(';').map(k => {
+      const f = k.split('/');
+      return f.length < 3 ? { t: f[0], r: '', m: '' } : { t: f[0], r: f[1], m: f[2] };
+    }).filter(t => t.t);
+    const last = rawTokens[rawTokens.length - 1];
+    if (!last || !/[。！？!?]/.test(last.t)) {
+      rawTokens.push({ t: '。', r: '', m: '' });
+    }
+    return {
+      newParagraph: paragraphs.includes(i),
+      translation: tr,
+      tokens: rawTokens,
+    };
+  });
+  const questions = (Q || []).map(([number, options, answer, explanation]) => ({
+    number,
+    prompt: '',
+    options,
+    answer,
+    explanation,
   }));
-  const questions = Q.map(([number, options, answer, explanation]) => ({ number, prompt: '', options, answer, explanation }));
-  return { id: uid(), created: Date.now(), title: `${title} (${level})`, lang: 'Thai', sampleLevel: level, sentences, questions, quiz: [], sample: true };
+  return {
+    id: id || uid(),
+    created: Date.now(),
+    title: `${title} (${level})`,
+    rawTitle: title,
+    summary: summary || '',
+    lang: 'Thai',
+    sampleLevel: level,
+    sampleId: id || uid(),
+    sentences,
+    questions,
+    quiz: [],
+    sample: true,
+  };
 }
 
-function openSample(lvl) {
-  const data = (typeof SAMPLES !== 'undefined' && SAMPLES[lvl]) || null;
-  if (!data) return;
-  let p = passages.find(x => x.sampleLevel === lvl);
+let activeLevel = 'Beginner';
+let lastView = 'library';
+
+function openSamplePassage(data) {
+  let p = passages.find(x => x.sampleId === data.id || x.id === data.id);
   if (!p) {
     p = makeSampleFromData(data);
     passages.unshift(p);
     savePassages();
   }
+  lastView = 'samples';
   openReader(p.id);
 }
 
 /* ---------- routing ---------- */
 function showView(name) {
   $('#library').hidden = name !== 'library';
+  $('#samplesView').hidden = name !== 'samples';
   $('#reader').hidden = name !== 'reader';
 }
+
 function route() {
-  const m = location.hash.match(/^#\/p\/(.+)$/);
-  const p = m && passages.find(x => x.id === decodeURIComponent(m[1]));
+  const h = location.hash || '#/';
+  const passageMatch = h.match(/^#\/p\/(.+)$/);
+  const samplesMatch = h.match(/^#\/samples(?:\/([^\/]+))?$/);
+
   closePanel(true);
-  if (p) { current = p; showView('reader'); renderReader(); }
-  else { current = null; showView('library'); renderLibrary(); }
+
+  if (passageMatch) {
+    const id = decodeURIComponent(passageMatch[1]);
+    const p = passages.find(x => x.id === id || x.sampleId === id);
+    if (p) {
+      current = p;
+      showView('reader');
+      const backLabel = $('#backLabel');
+      if (backLabel) backLabel.textContent = lastView === 'samples' ? 'Study' : 'Library';
+      renderReader();
+    } else {
+      location.hash = '#/';
+    }
+  } else if (samplesMatch) {
+    lastView = 'samples';
+    current = null;
+    if (samplesMatch[1]) {
+      const decodedLvl = decodeURIComponent(samplesMatch[1]);
+      if (['Beginner', 'N5', 'N4', 'N3', 'N2', 'N1'].includes(decodedLvl)) {
+        activeLevel = decodedLvl;
+      }
+    }
+    showView('samples');
+    renderSamplesView(activeLevel);
+  } else {
+    lastView = 'library';
+    current = null;
+    showView('library');
+    renderLibrary();
+  }
   window.scrollTo(0, 0);
 }
 const openReader = id => { location.hash = '#/p/' + encodeURIComponent(id); };
+
+/* ---------- study passages selection ---------- */
+function renderSamplesView(level = 'Beginner') {
+  activeLevel = level;
+  $$('.level-tab').forEach(tab => {
+    const isSel = tab.dataset.lvl === level;
+    tab.classList.toggle('active', isSel);
+    tab.setAttribute('aria-selected', isSel ? 'true' : 'false');
+  });
+
+  const levelTitles = {
+    Beginner: 'Beginner Passages',
+    N5: 'JLPT N5 Passages',
+    N4: 'JLPT N4 Passages',
+    N3: 'JLPT N3 Passages',
+    N2: 'JLPT N2 Passages',
+    N1: 'JLPT N1 Passages',
+  };
+  $('#samplesLevelHeader').textContent = levelTitles[level] || `${level} Passages`;
+
+  const list = (typeof SAMPLES !== 'undefined' && SAMPLES[level]) || [];
+  $('#samplesLevelCount').textContent = `${list.length} passages`;
+
+  const el = $('#sampleList');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty"><p>No passages available for this level.</p></div>';
+    return;
+  }
+
+  el.innerHTML = `<ul class="list">${list.map(item => {
+    const existing = passages.find(p => p.sampleId === item.id || p.id === item.id);
+    const badge = existing ? '<span class="badge in-study">Studying</span>' : '';
+    const qCount = item.Q ? item.Q.length : 0;
+    const subBits = [item.summary, `${item.S.length} sentences`, qCount ? `${qCount} quiz` : ''];
+    return `<li><button type="button" class="row sample-row" data-id="${esc(item.id)}">
+      <span class="row-main">
+        <span class="row-title" lang="ja">${esc(item.title)} ${badge}</span>
+        <span class="row-sub">${esc(subBits.filter(Boolean).join(' · '))}</span>
+      </span>${CHEV}
+    </button></li>`;
+  }).join('')}</ul>`;
+
+  $$('.sample-row', el).forEach(btn => {
+    btn.onclick = () => {
+      const item = list.find(x => x.id === btn.dataset.id);
+      if (item) openSamplePassage(item);
+    };
+  });
+}
 
 /* ---------- library ---------- */
 const CHEV = '<svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="m1 1 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -871,10 +977,15 @@ $('#quizAdd').onclick = () => {
 /* ---------- wiring ---------- */
 $('#openSettings').onclick = openSettings;
 $('#openScan').onclick = openScan;
-$$('.sample-pills .pill').forEach(btn => {
-  btn.onclick = () => openSample(btn.dataset.lvl);
+$('#openSamples').onclick = () => { location.hash = `#/samples/${activeLevel}`; };
+$('#samplesBack').onclick = () => { location.hash = '#/'; };
+$$('.level-tab').forEach(btn => {
+  btn.onclick = () => { location.hash = `#/samples/${btn.dataset.lvl}`; };
 });
-$('#back').onclick = () => { location.hash = '#/'; };
+$('#back').onclick = () => {
+  if (lastView === 'samples') location.hash = `#/samples/${activeLevel}`;
+  else location.hash = '#/';
+};
 $('#passage').addEventListener('click', e => {
   const w = e.target.closest('.w');
   if (w) selectWord(w);
@@ -890,7 +1001,7 @@ $('#delPassage').onclick = () => {
   if (!confirm(`Delete “${current.title}”? This can’t be undone.`)) return;
   passages = passages.filter(p => p !== current);
   savePassages();
-  location.hash = '#/';
+  location.hash = lastView === 'samples' ? `#/samples/${activeLevel}` : '#/';
 };
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#wordPanel').hidden && !document.querySelector('dialog[open]')) closePanel();
@@ -898,6 +1009,9 @@ document.addEventListener('keydown', e => {
 new IntersectionObserver(([e]) => {
   $('#navTitle').classList.toggle('visible', !e.isIntersecting && !$('#reader').hidden);
 }, { rootMargin: '-44px 0px 0px 0px' }).observe($('#readerTitle'));
+new IntersectionObserver(([e]) => {
+  $('#samplesNavTitle').classList.toggle('visible', !e.isIntersecting && !$('#samplesView').hidden);
+}, { rootMargin: '-44px 0px 0px 0px' }).observe($('#samplesLargeTitle'));
 if ('speechSynthesis' in window) speechSynthesis.getVoices();
 
 window.addEventListener('hashchange', route);
