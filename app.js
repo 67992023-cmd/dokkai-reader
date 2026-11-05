@@ -19,9 +19,80 @@ function save(key, value) {
   catch { alert('Browser storage is full. Delete a few passages and try again.'); return false; }
 }
 
-/* ---------- state ---------- */
-const DEFAULTS = { apiKey: '', model: 'gemini-2.5-flash', lang: 'Thai', models: [] };
-const settings = { ...DEFAULTS, ...load('settings', {}) };
+/* ---------- state & providers ---------- */
+const PROVIDERS = {
+  gemini: {
+    name: 'Google Gemini',
+    keyName: 'API key',
+    keySite: 'Google AI Studio',
+    keyUrl: 'https://aistudio.google.com/apikey',
+    defaultModel: 'gemini-2.5-flash',
+    defaultModels: [
+      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Recommended · Fast & Free)' },
+      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Flagship · Free 50/day)' },
+      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Next-gen fast)' },
+      { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite (Lightweight)' },
+      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Stable)' },
+      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Deep reasoning)' },
+    ],
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    keyName: 'API key',
+    keySite: 'OpenRouter',
+    keyUrl: 'https://openrouter.ai/keys',
+    defaultModel: 'qwen/qwen-2.5-vl-72b-instruct:free',
+    defaultModels: [
+      { id: 'qwen/qwen-2.5-vl-72b-instruct:free', name: 'Qwen 2.5 VL 72B (Free · Top Open Vision)' },
+      { id: 'google/gemma-4-31b-it:free', name: 'Google Gemma 4 31B (Free · Multimodal)' },
+      { id: 'meta-llama/llama-3.2-11b-vision-instruct:free', name: 'Llama 3.2 11B Vision (Free)' },
+      { id: 'nvidia/nemotron-3.5-super-vl:free', name: 'Nemotron 3.5 Super VL (Free)' },
+      { id: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash Exp (Free)' },
+      { id: 'qwen/qwen-2.5-vl-72b-instruct', name: 'Qwen 2.5 VL 72B (Paid endpoint)' },
+    ],
+  },
+  groq: {
+    name: 'Groq',
+    keyName: 'API key',
+    keySite: 'Groq Console',
+    keyUrl: 'https://console.groq.com/keys',
+    defaultModel: 'llama-3.2-11b-vision-preview',
+    defaultModels: [
+      { id: 'llama-3.2-11b-vision-preview', name: 'Llama 3.2 11B Vision (Free · Ultra-fast)' },
+      { id: 'llama-3.2-90b-vision-preview', name: 'Llama 3.2 90B Vision (Free · Large)' },
+    ],
+  },
+};
+
+const DEFAULTS = {
+  provider: 'gemini',
+  keys: { gemini: '', openrouter: '', groq: '' },
+  models: {
+    gemini: 'gemini-2.5-flash',
+    openrouter: 'qwen/qwen-2.5-vl-72b-instruct:free',
+    groq: 'llama-3.2-11b-vision-preview',
+  },
+  customModels: { gemini: '', openrouter: '', groq: '' },
+  providerModels: { gemini: [], openrouter: [], groq: [] },
+  lang: 'Thai',
+};
+
+const rawSettings = load('settings', {});
+if (rawSettings.apiKey && (!rawSettings.keys || !rawSettings.keys.gemini)) {
+  rawSettings.keys = { ...DEFAULTS.keys, ...(rawSettings.keys || {}), gemini: rawSettings.apiKey };
+}
+if (rawSettings.model && (!rawSettings.models || !rawSettings.models.gemini)) {
+  rawSettings.models = { ...DEFAULTS.models, ...(rawSettings.models || {}), gemini: rawSettings.model };
+}
+
+const settings = {
+  ...DEFAULTS,
+  ...rawSettings,
+  keys: { ...DEFAULTS.keys, ...(rawSettings.keys || {}) },
+  models: { ...DEFAULTS.models, ...(rawSettings.models || {}) },
+  customModels: { ...DEFAULTS.customModels, ...(rawSettings.customModels || {}) },
+  providerModels: { ...DEFAULTS.providerModels, ...(rawSettings.providerModels || {}) },
+};
 const ui = { furi: true, tr: false, mode: '', ...load('ui', {}) };
 let passages = load('passages', []);
 let current = null;
@@ -30,6 +101,21 @@ let selected = null;
 const savePassages = () => save('passages', passages);
 const saveSettings = () => save('settings', settings);
 const saveUi = () => save('ui', ui);
+
+const getProvider = () => settings.provider || 'gemini';
+const getKey = (p = getProvider()) => (settings.keys && settings.keys[p]) || (p === 'gemini' ? (settings.apiKey || '') : '');
+const setKey = (p, k) => {
+  if (!settings.keys) settings.keys = {};
+  settings.keys[p] = k;
+  if (p === 'gemini') settings.apiKey = k;
+};
+const getActiveModel = (p = getProvider()) => {
+  const chosen = (settings.models && settings.models[p]) || PROVIDERS[p]?.defaultModel;
+  if (chosen === '__custom__') {
+    return (settings.customModels && settings.customModels[p]) || '';
+  }
+  return chosen;
+};
 
 /* ---------- prompts and schemas ---------- */
 const Q_SCHEMA = {
@@ -113,14 +199,16 @@ Reply with only one JSON object in a code block, no other text, in exactly this 
 {"questions":[{"number":1,"prompt":"...","options":["...","...","...","..."],"answer":0,"explanation":"..."}]}` : ''}`;
 }
 
-/* ---------- Gemini API ---------- */
+/* ---------- AI Providers & API ---------- */
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
-function friendlyError(status, msg = '') {
-  if ((status === 400 && /api key/i.test(msg)) || status === 401 || status === 403) return 'Gemini didn’t accept the API key. Check it in Settings.';
-  if (status === 404) return `The model “${settings.model}” isn’t available. Choose another model in Settings.`;
-  if (status === 429) return 'You’ve reached the free limit for now. Wait a minute and try again, or use the Gemini App tab.';
-  if (status >= 500) return 'Gemini is busy right now. Try again in a moment.';
+function friendlyError(status, err) {
+  const msg = typeof err === 'string' ? err : err?.message || '';
+  const prov = PROVIDERS[getProvider()]?.name || 'AI service';
+  if ((status === 400 && /api key/i.test(msg)) || status === 401 || status === 403) return `${prov} didn’t accept the API key. Check it in Settings.`;
+  if (status === 404) return `The model “${getActiveModel()}” isn’t available on ${prov}. Choose another model in Settings.`;
+  if (status === 429) return `You’ve reached the free limit for ${prov}. Wait a minute and try again, or switch models in Settings.`;
+  if (status >= 500) return `${prov} is busy right now. Try again in a moment.`;
   return msg || `The request failed (${status}).`;
 }
 
@@ -129,48 +217,124 @@ async function apiFetch(url, opts = {}) {
   try { res = await fetch(url, opts); }
   catch (e) {
     if (e.name === 'AbortError') throw e;
-    throw new Error('Couldn’t reach Gemini. Check your internet connection.');
+    throw new Error('Couldn’t reach the AI service. Check your internet connection.');
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(friendlyError(res.status, data?.error?.message));
+  if (!res.ok) throw new Error(friendlyError(res.status, data?.error?.message || data?.error));
   return data;
 }
 
-async function gemini(parts, schema, signal) {
-  const data = await apiFetch(`${API}/models/${encodeURIComponent(settings.model)}:generateContent`, {
+async function callAI({ images = [], textPrompt, schema, signal }) {
+  const provId = getProvider();
+  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
+  const key = getKey(provId);
+  const model = getActiveModel(provId);
+
+  if (!key) throw new Error(`Please add your ${prov.name} API key in Settings.`);
+  if (!model) throw new Error(`Please select or enter a model in Settings.`);
+
+  if (provId === 'gemini') {
+    const parts = images.map(p => ({ inline_data: { mime_type: p.mime, data: p.data } }));
+    parts.push({ text: textPrompt });
+    const data = await apiFetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+      body: JSON.stringify({
+        contents: [{ role: 'user', parts }],
+        generationConfig: {
+          responseMimeType: 'application/json',
+          ...(schema ? { responseSchema: schema } : {}),
+        },
+      }),
+    });
+    const cand = data.candidates?.[0];
+    const text = (cand?.content?.parts || []).map(p => p.text || '').join('');
+    if (cand?.finishReason === 'MAX_TOKENS') throw new Error('The passage is too long for one scan. Try fewer photos at a time.');
+    if (!text) throw new Error(data.promptFeedback?.blockReason ? 'Gemini declined this image. Try a different photo.' : 'Gemini returned an empty answer. Try again.');
+    return parseJSON(text);
+  }
+
+  // OpenAI-compatible (OpenRouter or Groq)
+  const isOR = provId === 'openrouter';
+  const endpoint = isOR
+    ? 'https://openrouter.ai/api/v1/chat/completions'
+    : 'https://api.groq.com/openai/v1/chat/completions';
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${key}`,
+  };
+  if (isOR) {
+    headers['HTTP-Referer'] = location.origin || 'https://github.com';
+    headers['X-Title'] = 'Dokkai Reader';
+  }
+
+  const content = [];
+  for (const img of images) {
+    content.push({
+      type: 'image_url',
+      image_url: { url: `data:${img.mime};base64,${img.data}` },
+    });
+  }
+  content.push({ type: 'text', text: textPrompt });
+
+  const data = await apiFetch(endpoint, {
     method: 'POST',
     signal,
-    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': settings.apiKey },
+    headers,
     body: JSON.stringify({
-      contents: [{ role: 'user', parts }],
-      generationConfig: { responseMimeType: 'application/json', responseSchema: schema },
+      model,
+      messages: [{ role: 'user', content }],
+      response_format: { type: 'json_object' },
     }),
   });
-  const cand = data.candidates?.[0];
-  const text = (cand?.content?.parts || []).map(p => p.text || '').join('');
-  if (cand?.finishReason === 'MAX_TOKENS') throw new Error('The passage is too long for one scan. Try fewer photos at a time.');
-  if (!text) throw new Error(data.promptFeedback?.blockReason ? 'Gemini declined this image. Try a different photo.' : 'Gemini returned an empty answer. Try again.');
-  return parseJSON(text);
+
+  const cand = data.choices?.[0]?.message?.content;
+  if (!cand) throw new Error(`${prov.name} returned an empty answer. Try again.`);
+  return parseJSON(cand);
 }
 
 const ver = n => { const m = n.match(/^gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
-const isPreview = n => /(preview|exp)/.test(n);
-function pickDefaultModel(list) {
-  const flash = list.filter(n => /flash/.test(n) && !/lite/.test(n));
-  const pool = flash.length ? flash : list;
-  return [...pool].sort((a, b) => ver(b) - ver(a) || isPreview(a) - isPreview(b) || a.length - b.length)[0] || DEFAULTS.model;
-}
+async function refreshModels() {
+  const provId = getProvider();
+  const prov = PROVIDERS[provId];
+  const key = getKey(provId);
 
-async function refreshModels(key) {
-  const data = await apiFetch(`${API}/models?pageSize=1000`, { headers: { 'x-goog-api-key': key } });
-  const names = (data.models || [])
-    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-    .map(m => m.name.replace(/^models\//, ''))
-    .filter(n => /^gemini-/.test(n) && !/(tts|image|embedding|audio|live|robotics|computer-use)/.test(n));
-  settings.models = [...new Set(names)].sort((a, b) => ver(b) - ver(a) || a.localeCompare(b));
-  if (!settings.models.includes(settings.model)) settings.model = pickDefaultModel(settings.models);
+  if (provId === 'gemini') {
+    if (!key) throw new Error('Enter a Google AI Studio API key first.');
+    const data = await apiFetch(`${API}/models?pageSize=1000`, { headers: { 'x-goog-api-key': key } });
+    const names = (data.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name.replace(/^models\//, ''))
+      .filter(n => /^gemini-/.test(n) && !/(tts|image|embedding|audio|live|robotics|computer-use)/.test(n));
+    const sorted = [...new Set(names)].sort((a, b) => ver(b) - ver(a) || a.localeCompare(b));
+    settings.providerModels.gemini = sorted.map(id => ({ id, name: id }));
+  } else if (provId === 'openrouter') {
+    const res = await apiFetch('https://openrouter.ai/api/v1/models');
+    const list = res.data || [];
+    const freeOrVision = list.filter(m => {
+      const isFree = m.id?.includes(':free');
+      const mod = m.architecture?.modality || '';
+      return isFree || mod.includes('image');
+    }).map(m => ({
+      id: m.id,
+      name: `${m.name || m.id}${m.id.includes(':free') ? ' (Free)' : ''}`,
+      free: m.id.includes(':free'),
+    })).sort((a, b) => (b.free - a.free) || a.name.localeCompare(b.name));
+    settings.providerModels.openrouter = freeOrVision.slice(0, 30);
+  } else if (provId === 'groq') {
+    if (!key) throw new Error('Enter a Groq API key first.');
+    const res = await apiFetch('https://api.groq.com/openai/v1/models', {
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    const list = (res.data || [])
+      .filter(m => /vision|llama/i.test(m.id))
+      .map(m => ({ id: m.id, name: m.id }));
+    settings.providerModels.groq = list;
+  }
   saveSettings();
-  return settings.models;
+  return (settings.providerModels[provId] || []).length;
 }
 
 /* ---------- parsing and normalising ---------- */
@@ -422,13 +586,18 @@ async function autoQuiz() {
   $('#quizSec').hidden = false;
   st.hidden = false;
   st.classList.remove('err');
-  st.textContent = 'Writing questions about this passage…';
+  st.textContent = `Writing questions using ${getActiveModel()}…`;
   btn.disabled = true;
   st.scrollIntoView({ behavior: smooth(), block: 'center' });
   try {
-    const out = await gemini([{ text: quizPrompt(p, false) }], QUIZ_SCHEMA);
+    const isGemini = getProvider() === 'gemini';
+    const out = await callAI({
+      images: [],
+      textPrompt: quizPrompt(p, !isGemini),
+      schema: QUIZ_SCHEMA,
+    });
     const quiz = normQs(out.questions);
-    if (!quiz.length) throw new Error('Gemini didn’t return any questions. Try again.');
+    if (!quiz.length) throw new Error('The AI didn’t return any questions. Try again.');
     p.quiz = quiz;
     savePassages();
     if (current === p) renderQuiz();
@@ -460,39 +629,89 @@ async function copyText(text, btn) {
 }
 
 /* ---------- settings ---------- */
-function fillModelSelect() {
-  const list = settings.models?.length ? [...settings.models] : [DEFAULTS.model];
-  if (!list.includes(settings.model)) list.unshift(settings.model);
-  $('#sModel').innerHTML = list.map(n => `<option${n === settings.model ? ' selected' : ''}>${esc(n)}</option>`).join('');
+function getModelList(provId) {
+  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
+  const fetched = settings.providerModels?.[provId];
+  if (fetched && fetched.length) return fetched;
+  return prov.defaultModels;
+}
+
+function updateSettingsForm() {
+  const provId = $('#sProvider').value;
+  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
+
+  $('#sKeyLabel').textContent = `${prov.name} Key`;
+  $('#sKey').placeholder = `Paste your ${prov.keyName}`;
+  $('#sKey').value = getKey(provId);
+
+  const models = getModelList(provId);
+  const currentChosen = settings.models?.[provId] || prov.defaultModel;
+  const isCustom = currentChosen === '__custom__' || (!models.some(m => m.id === currentChosen) && Boolean(settings.customModels?.[provId]));
+
+  let opts = models.map(m => `<option value="${esc(m.id)}"${!isCustom && m.id === currentChosen ? ' selected' : ''}>${esc(m.name)}</option>`).join('');
+  opts += `<option value="__custom__"${isCustom ? ' selected' : ''}>Custom Model ID…</option>`;
+  $('#sModel').innerHTML = opts;
+
+  $('#sCustomField').hidden = !isCustom;
+  $('#sCustomModel').value = settings.customModels?.[provId] || (isCustom ? currentChosen : '');
+
+  $('#sFootText').innerHTML = `Get a free key at <a href="${prov.keyUrl}" target="_blank" rel="noopener">${prov.keySite}</a>. The key is saved only in this browser and never uploaded.`;
 }
 
 function openSettings() {
-  $('#sKey').value = settings.apiKey;
-  $('#sLang').value = settings.lang;
+  $('#sProvider').value = getProvider();
+  $('#sLang').value = settings.lang || 'Thai';
   $('#sStatus').textContent = '';
-  fillModelSelect();
+  updateSettingsForm();
   $('#settingsDlg').showModal();
 }
 
+$('#sProvider').addEventListener('change', () => {
+  settings.provider = $('#sProvider').value;
+  updateSettingsForm();
+});
+
+$('#sModel').addEventListener('change', () => {
+  const isCustom = $('#sModel').value === '__custom__';
+  $('#sCustomField').hidden = !isCustom;
+  if (isCustom) $('#sCustomModel').focus();
+});
+
 $('#settingsForm').addEventListener('submit', () => {
+  const provId = $('#sProvider').value;
   const key = $('#sKey').value.trim();
-  const keyChanged = key !== settings.apiKey;
-  settings.apiKey = key;
-  settings.model = $('#sModel').value || settings.model;
+  const prevKey = getKey(provId);
+  setKey(provId, key);
+
+  settings.provider = provId;
+  const selectedModel = $('#sModel').value;
+  if (selectedModel === '__custom__') {
+    settings.models[provId] = '__custom__';
+    settings.customModels[provId] = $('#sCustomModel').value.trim();
+  } else {
+    settings.models[provId] = selectedModel;
+  }
   settings.lang = $('#sLang').value;
   saveSettings();
-  if (keyChanged && key) refreshModels(key).catch(() => {});
+
+  if (key && key !== prevKey && provId === 'gemini') {
+    refreshModels().catch(() => {});
+  }
 });
 
 $('#sRefresh').onclick = async () => {
+  const provId = $('#sProvider').value;
+  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
   const key = $('#sKey').value.trim();
+  setKey(provId, key);
+  saveSettings();
+
   const st = $('#sStatus');
-  if (!key) { st.textContent = 'Enter an API key first.'; return; }
-  st.textContent = 'Loading models…';
+  st.textContent = `Loading models from ${prov.name}…`;
   try {
-    const list = await refreshModels(key);
-    fillModelSelect();
-    st.textContent = `Found ${list.length} models. ${settings.model} is selected.`;
+    const count = await refreshModels();
+    updateSettingsForm();
+    st.textContent = `Found ${count} models for ${prov.name}.`;
   } catch (e) {
     st.textContent = e.message;
   }
@@ -518,8 +737,17 @@ function setMode(mode) {
 }
 
 function updateScanState() {
-  $('#noKey').hidden = !!settings.apiKey;
-  $('#createAuto').disabled = !settings.apiKey || !pending.length;
+  const provId = getProvider();
+  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
+  const key = getKey(provId);
+  const model = getActiveModel(provId);
+  const hasKey = Boolean(key && model);
+
+  $('#noKey').hidden = hasKey;
+  if (!hasKey) {
+    $('#noKeyText').textContent = `Automatic needs a free ${prov.name} API key.`;
+  }
+  $('#createAuto').disabled = !hasKey || !pending.length;
   $('#createManual').disabled = !$('#pasteIn').value.trim();
 }
 
@@ -588,7 +816,7 @@ function finishPassage(out) {
 
 function openScan() {
   setBusy(false);
-  setMode(ui.mode || (settings.apiKey ? 'auto' : 'manual'));
+  setMode(ui.mode || (getKey() ? 'auto' : 'manual'));
   renderThumbs();
   updateScanState();
   $('#scanDlg').showModal();
@@ -610,9 +838,14 @@ $('#createAuto').onclick = async () => {
   setBusy(true);
   abortCtl = new AbortController();
   try {
-    const parts = pending.map(p => ({ inline_data: { mime_type: p.mime, data: p.data } }));
-    parts.push({ text: passagePrompt(settings.lang) });
-    const out = await gemini(parts, PASSAGE_SCHEMA, abortCtl.signal);
+    const isGemini = getProvider() === 'gemini';
+    const textPrompt = isGemini ? passagePrompt(settings.lang) : manualPassagePrompt(settings.lang);
+    const out = await callAI({
+      images: pending,
+      textPrompt,
+      schema: PASSAGE_SCHEMA,
+      signal: abortCtl.signal,
+    });
     setBusy(false);
     finishPassage(out);
   } catch (e) {
@@ -678,7 +911,7 @@ $('#passage').addEventListener('keydown', e => {
 });
 $('#tgFuri').onclick = () => { ui.furi = !ui.furi; saveUi(); applyToggles(); };
 $('#tgTr').onclick = () => { ui.tr = !ui.tr; saveUi(); applyToggles(); };
-$('#mkQuiz').onclick = () => (settings.apiKey ? autoQuiz() : openQuizDlg());
+$('#mkQuiz').onclick = () => (getKey() ? autoQuiz() : openQuizDlg());
 $('#delPassage').onclick = () => {
   if (!confirm(`Delete “${current.title}”? This can’t be undone.`)) return;
   passages = passages.filter(p => p !== current);
