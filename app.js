@@ -391,10 +391,10 @@ function normPassage(o, lang) {
   return { id: uid(), created: Date.now(), title, lang, sentences, questions: normQs(o.questions), quiz: [] };
 }
 
-function makeSample() {
-  const { S, Q } = SAMPLE;
+function makeSampleFromData(data) {
+  const { S, Q, paragraphs = [0], title, level } = data;
   const sentences = S.map(([toks, tr], i) => ({
-    newParagraph: [0, 5, 13].includes(i),
+    newParagraph: paragraphs.includes(i),
     translation: tr,
     tokens: [
       ...toks.split(';').map(k => {
@@ -405,7 +405,19 @@ function makeSample() {
     ],
   }));
   const questions = Q.map(([number, options, answer, explanation]) => ({ number, prompt: '', options, answer, explanation }));
-  return { id: uid(), created: Date.now(), title: '有栖川からの手紙', lang: 'Thai', sentences, questions, quiz: [], sample: true };
+  return { id: uid(), created: Date.now(), title: `${title} (${level})`, lang: 'Thai', sampleLevel: level, sentences, questions, quiz: [], sample: true };
+}
+
+function openSample(lvl) {
+  const data = (typeof SAMPLES !== 'undefined' && SAMPLES[lvl]) || null;
+  if (!data) return;
+  let p = passages.find(x => x.sampleLevel === lvl);
+  if (!p) {
+    p = makeSampleFromData(data);
+    passages.unshift(p);
+    savePassages();
+  }
+  openReader(p.id);
 }
 
 /* ---------- routing ---------- */
@@ -433,15 +445,8 @@ function renderLibrary() {
     el.innerHTML = `
       <div class="empty">
         <h2>No passages yet</h2>
-        <p>Take a photo of a Japanese reading passage. It becomes a page where you can tap any word to see its reading and meaning.</p>
-        <button type="button" class="btn secondary" id="trySample">Open Sample Passage</button>
+        <p>Scan your reading passage, or tap a sample below to start studying.</p>
       </div>`;
-    $('#trySample').onclick = () => {
-      const p = makeSample();
-      passages.unshift(p);
-      savePassages();
-      openReader(p.id);
-    };
     return;
   }
   el.innerHTML = `<ul class="list">${passages.map(p => {
@@ -866,6 +871,9 @@ $('#quizAdd').onclick = () => {
 /* ---------- wiring ---------- */
 $('#openSettings').onclick = openSettings;
 $('#openScan').onclick = openScan;
+$$('.sample-pills .pill').forEach(btn => {
+  btn.onclick = () => openSample(btn.dataset.lvl);
+});
 $('#back').onclick = () => { location.hash = '#/'; };
 $('#passage').addEventListener('click', e => {
   const w = e.target.closest('.w');

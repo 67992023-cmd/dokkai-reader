@@ -89,7 +89,7 @@ a { color: var(--accent); }
 
 .content {
   max-width: 720px; margin: 0 auto;
-  padding: 0 20px calc(120px + env(safe-area-inset-bottom));
+  padding: 0 20px calc(160px + env(safe-area-inset-bottom));
 }
 .large-title { font-size: 34px; line-height: 41px; font-weight: 700; margin: 4px 0 20px; }
 
@@ -128,10 +128,35 @@ a { color: var(--accent); }
 
 .bottom-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
-  padding: 16px 20px calc(12px + env(safe-area-inset-bottom));
-  background: linear-gradient(to top, var(--bg) 65%, transparent);
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 85%, color-mix(in srgb, var(--bg) 95%, transparent) 40%, transparent);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
 }
 .bottom-bar .btn { max-width: 680px; margin: 0 auto; }
+
+.sample-bar {
+  max-width: 680px; margin: 10px auto 0;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+}
+.sample-title {
+  font-size: 13px; font-weight: 500; letter-spacing: .01em;
+  color: var(--label2);
+}
+.sample-pills {
+  display: flex; gap: 8px; width: 100%; max-width: 420px;
+}
+.pill {
+  flex: 1; min-height: 34px; padding: 0; border: 1px solid var(--sep);
+  border-radius: 99px; background: color-mix(in srgb, var(--surface) 50%, transparent);
+  color: var(--label2); font-size: 14px; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all .15s ease;
+}
+.pill:hover, .pill:focus-visible {
+  color: var(--accent); border-color: var(--accent); background: var(--accent-tint);
+}
+.pill:active { transform: scale(.96); }
 
 /* Reader */
 .passage-title { font-family: var(--font-jp); font-size: 28px; line-height: 1.3; font-weight: 600; margin: 8px 0 16px; }

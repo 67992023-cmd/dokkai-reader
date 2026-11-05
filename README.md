@@ -72,4 +72,4 @@ On iPhone: Open in Safari, tap **Share → Add to Home Screen** to install as a 
 - [index.html](file:///Users/po/Desktop/N3ReadingStudy/index.html): Semantic layout, dialogs, and controls.
 - [style.css](file:///Users/po/Desktop/N3ReadingStudy/style.css): Apple HIG design tokens, dark and light appearance.
 - [app.js](file:///Users/po/Desktop/N3ReadingStudy/app.js): Multi-provider API routing, OCR parser, tokenizer, reader, quiz generator, and storage.
-- [sample.js](file:///Users/po/Desktop/N3ReadingStudy/sample.js): Bundled sample reading passage.
+- [sample.js](file:///Users/po/Desktop/N3ReadingStudy/sample.js): Bundled JLPT sample reading passages for N1, N2, N3, N4, and N5 with interactive comprehension questions.
