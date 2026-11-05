@@ -69,6 +69,10 @@ const DEFAULTS = {
   customModel: '',
   keys: { gemini: '', openrouter: '', groq: '' },
   lang: 'Thai',
+  appearance: 'system',
+  highlightColor: 'amber',
+  fontFamily: 'mincho',
+  fontSize: 'standard',
 };
 
 const rawSettings = load('settings', {});
@@ -87,12 +91,80 @@ const settings = {
 };
 const ui = { furi: true, tr: false, mode: '', ...load('ui', {}) };
 let passages = load('passages', []);
+let starVocab = load('starVocab', []);
 let current = null;
 let selected = null;
 
 const savePassages = () => save('passages', passages);
+const saveStarVocab = () => save('starVocab', starVocab);
 const saveSettings = () => save('settings', settings);
 const saveUi = () => save('ui', ui);
+
+/* ---------- customization & appearance ---------- */
+function applyAppearance(mode) {
+  settings.appearance = mode || 'system';
+  saveSettings();
+  if (mode === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else if (mode === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+  $$('.theme-tab').forEach(b => {
+    const isSel = b.dataset.themeVal === settings.appearance;
+    b.classList.toggle('active', isSel);
+    b.setAttribute('aria-selected', isSel ? 'true' : 'false');
+  });
+}
+
+const HL_NAMES = {
+  amber: 'Warm Amber',
+  sage: 'Matcha Sage',
+  sky: 'Soft Sky',
+  lavender: 'Lavender',
+  sakura: 'Sakura Pink',
+};
+
+function applyHighlightColor(color) {
+  settings.highlightColor = color || 'amber';
+  saveSettings();
+  document.documentElement.setAttribute('data-hl', settings.highlightColor);
+  const label = $('#hlColorName');
+  if (label) label.textContent = HL_NAMES[settings.highlightColor] || settings.highlightColor;
+  $$('.hl-swatch').forEach(b => {
+    const isSel = b.dataset.hlVal === settings.highlightColor;
+    b.classList.toggle('active', isSel);
+    b.setAttribute('aria-checked', isSel ? 'true' : 'false');
+  });
+}
+
+function applyFontFamily(font) {
+  settings.fontFamily = font || 'mincho';
+  saveSettings();
+  document.documentElement.setAttribute('data-font', settings.fontFamily);
+  const sel = $('#sFontFamily');
+  if (sel && sel.value !== settings.fontFamily) sel.value = settings.fontFamily;
+}
+
+function applyFontSize(size) {
+  settings.fontSize = size || 'standard';
+  saveSettings();
+  document.documentElement.setAttribute('data-size', settings.fontSize);
+  const sel = $('#sFontSize');
+  if (sel && sel.value !== settings.fontSize) sel.value = settings.fontSize;
+}
+
+function updateVocabBadge() {
+  const count = starVocab.length;
+  const badge = $('#vocabBadge');
+  if (badge) {
+    badge.textContent = count;
+    badge.hidden = count === 0;
+  }
+  const total = $('#vocabTotalCount');
+  if (total) total.textContent = `${count} word${count === 1 ? '' : 's'}`;
+}
 
 const getKey = prov => (settings.keys && settings.keys[prov]) || (prov === 'gemini' ? (settings.apiKey || '') : '');
 const setKey = (prov, val) => {
@@ -464,12 +536,14 @@ function showView(name) {
   $('#library').hidden = name !== 'library';
   $('#samplesView').hidden = name !== 'samples';
   $('#reader').hidden = name !== 'reader';
+  $('#vocabView').hidden = name !== 'vocab';
 }
 
 function route() {
   const h = location.hash || '#/';
   const passageMatch = h.match(/^#\/p\/(.+)$/);
   const samplesMatch = h.match(/^#\/samples(?:\/([^\/]+))?$/);
+  const vocabMatch = h.match(/^#\/vocab$/);
 
   closePanel(true);
 
@@ -491,7 +565,7 @@ function route() {
       current = p;
       showView('reader');
       const backLabel = $('#backLabel');
-      if (backLabel) backLabel.textContent = lastView === 'samples' ? 'Study' : 'Library';
+      if (backLabel) backLabel.textContent = lastView === 'samples' ? 'Study' : (lastView === 'vocab' ? 'Vocab' : 'Library');
       renderReader();
     } else {
       location.hash = '#/';
@@ -507,6 +581,11 @@ function route() {
     }
     showView('samples');
     renderSamplesView(activeLevel);
+  } else if (vocabMatch) {
+    lastView = 'vocab';
+    current = null;
+    showView('vocab');
+    renderVocabView();
   } else {
     lastView = 'library';
     current = null;
@@ -608,9 +687,10 @@ function sentenceHTML(s, i, lang) {
     if (!t.r && !t.m) return esc(t.t);
     const blank = /^【\d+】$/.test(t.t);
     const face = t.r ? rubyHTML(t.t, t.r) : esc(t.t);
-    return `<span class="w${blank ? ' blank' : ''}" role="button" tabindex="0" data-s="${i}" data-k="${k}">${face}</span>`;
+    const starred = starVocab.some(v => v.word === t.t && (!t.r || !v.reading || v.reading === t.r));
+    return `<span class="w${blank ? ' blank' : ''}${starred ? ' has-star' : ''}" role="button" tabindex="0" data-s="${i}" data-k="${k}">${face}</span>`;
   }).join('');
-  return `<span class="sent">${toks}<span class="tr" lang="${lang}">${esc(s.translation)}</span></span>`;
+  return `<span class="sent" data-si="${i}">${toks}<span class="tr" lang="${lang}">${esc(s.translation)}</span></span>`;
 }
 
 function renderReader() {
@@ -674,8 +754,12 @@ function selectWord(w) {
   const s = current.sentences[Number(w.dataset.s)];
   const t = s.tokens[Number(w.dataset.k)];
   selected?.classList.remove('on');
+  $('.sent.s-active')?.classList.remove('s-active');
+
   selected = w;
   w.classList.add('on');
+  w.closest('.sent')?.classList.add('s-active');
+
   const blank = t.t.match(/^【(\d+)】$/);
   if (blank) {
     const q = document.getElementById('q-p-' + blank[1]);
@@ -693,10 +777,22 @@ function showPanel(t, s, blank) {
   const ph = $('#wordPlaceholder');
   if (ph) ph.hidden = true;
   const sentence = s.tokens.map(x => x.t).join('').replace(/【\d+】/g, '');
+  const isStarred = starVocab.some(x => x.word === t.t && (!t.r || !x.reading || x.reading === t.r));
+
   panel.innerHTML = `
     <div class="wp-head">
       <div lang="ja"><span class="wp-surface">${esc(t.t)}</span>${t.r ? `<span class="wp-reading">${esc(t.r)}</span>` : ''}</div>
-      <button type="button" class="link" id="wpClose">Done</button>
+      <div class="wp-head-actions">
+        ${blank ? '' : `
+          <button type="button" class="btn-star ${isStarred ? 'starred' : ''}" id="wpStar" aria-label="${isStarred ? 'Remove from Star Vocab' : 'Add to Star Vocab'}" title="${isStarred ? 'Starred' : 'Star Word'}">
+            <svg viewBox="0 0 24 24" fill="${isStarred ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            <span class="star-btn-label">${isStarred ? 'Starred' : 'Star'}</span>
+          </button>
+        `}
+        <button type="button" class="link" id="wpClose">Done</button>
+      </div>
     </div>
     <p class="wp-meaning">${esc(t.m)}</p>
     <div class="wp-actions">
@@ -710,6 +806,40 @@ function showPanel(t, s, blank) {
   $('#wpClose').onclick = () => closePanel();
   if (!blank) $('#wpSay').onclick = () => speak(t.r || t.t);
   $('#wpSaySent').onclick = () => speak(sentence);
+
+  const starBtn = $('#wpStar');
+  if (starBtn) {
+    starBtn.onclick = () => {
+      const currentlyStarred = starVocab.some(x => x.word === t.t && (!t.r || !x.reading || x.reading === t.r));
+      if (currentlyStarred) {
+        starVocab = starVocab.filter(x => !(x.word === t.t && (!t.r || !x.reading || x.reading === t.r)));
+        starBtn.classList.remove('starred');
+        const lbl = $('.star-btn-label', starBtn);
+        if (lbl) lbl.textContent = 'Star';
+        $('svg', starBtn)?.setAttribute('fill', 'none');
+        selected?.classList.remove('has-star');
+      } else {
+        starVocab.unshift({
+          id: uid(),
+          word: t.t,
+          reading: t.r || '',
+          meaning: t.m || '',
+          sentence,
+          translation: s.translation || '',
+          sourceTitle: current?.title || '',
+          sourceId: current?.id || '',
+          addedAt: Date.now(),
+        });
+        starBtn.classList.add('starred');
+        const lbl = $('.star-btn-label', starBtn);
+        if (lbl) lbl.textContent = 'Starred';
+        $('svg', starBtn)?.setAttribute('fill', 'currentColor');
+        selected?.classList.add('has-star');
+      }
+      saveStarVocab();
+      updateVocabBadge();
+    };
+  }
 }
 
 function closePanel(instant) {
@@ -717,6 +847,7 @@ function closePanel(instant) {
   const ph = $('#wordPlaceholder');
   if (ph) ph.hidden = false;
   selected?.classList.remove('on');
+  $('.sent.s-active')?.classList.remove('s-active');
   const prev = selected;
   selected = null;
   document.body.classList.remove('panel-open');
@@ -790,8 +921,36 @@ async function copyText(text, btn) {
   setTimeout(() => { btn.textContent = label; }, 1800);
 }
 
-/* ---------- settings ---------- */
+/* ---------- settings & customization ---------- */
+function updateAiSubSummary() {
+  const chosen = settings.selectedModel || 'auto';
+  const auto = settings.autoSwitch !== false;
+  let modelName = 'Auto';
+  if (chosen !== 'auto') {
+    const found = MODEL_RANKING.find(m => m.id === chosen);
+    modelName = found ? found.name : chosen;
+  } else {
+    modelName = 'Auto (Gemini Pro → Fallback)';
+  }
+  const keysSet = [getKey('gemini'), getKey('openrouter'), getKey('groq')].filter(Boolean).length;
+  const keySummary = keysSet === 0 ? 'No keys set' : `${keysSet} key${keysSet === 1 ? '' : 's'}`;
+  const sub = $('#sAiSubSummary');
+  if (sub) sub.textContent = `${modelName} · ${keySummary}${auto ? ' · Auto-switch on' : ''}`;
+}
+
 function openSettings() {
+  applyAppearance(settings.appearance);
+  applyHighlightColor(settings.highlightColor);
+  applyFontFamily(settings.fontFamily);
+  applyFontSize(settings.fontSize);
+  updateAiSubSummary();
+
+  $('#sLang').value = settings.lang || 'Thai';
+  $('#settingsDlg').showModal();
+}
+
+function openAiSettings() {
+  $('#settingsDlg').close();
   $('#sModel').value = settings.selectedModel || 'auto';
   $('#sCustomField').hidden = settings.selectedModel !== '__custom__';
   $('#sCustomModel').value = settings.customModel || '';
@@ -801,9 +960,40 @@ function openSettings() {
   $('#sKeyOpenRouter').value = getKey('openrouter');
   $('#sKeyGroq').value = getKey('groq');
 
-  $('#sLang').value = settings.lang || 'Thai';
-  $('#settingsDlg').showModal();
+  $('#aiSettingsDlg').showModal();
 }
+
+function saveAiSettings() {
+  settings.selectedModel = $('#sModel').value;
+  settings.customModel = $('#sCustomModel').value.trim();
+  settings.autoSwitch = $('#sAutoSwitch').checked;
+
+  setKey('gemini', $('#sKeyGemini').value.trim());
+  setKey('openrouter', $('#sKeyOpenRouter').value.trim());
+  setKey('groq', $('#sKeyGroq').value.trim());
+  saveSettings();
+  updateAiSubSummary();
+  updateScanState();
+}
+
+$('#openAiSettings').onclick = openAiSettings;
+$('#aiSettingsBack').onclick = () => {
+  saveAiSettings();
+  $('#aiSettingsDlg').close();
+  openSettings();
+};
+$('#aiSettingsForm').addEventListener('submit', () => {
+  saveAiSettings();
+});
+
+$$('.theme-tab').forEach(btn => {
+  btn.onclick = () => applyAppearance(btn.dataset.themeVal);
+});
+$$('.hl-swatch').forEach(btn => {
+  btn.onclick = () => applyHighlightColor(btn.dataset.hlVal);
+});
+$('#sFontFamily').onchange = () => applyFontFamily($('#sFontFamily').value);
+$('#sFontSize').onchange = () => applyFontSize($('#sFontSize').value);
 
 $('#sModel').addEventListener('change', () => {
   const isCustom = $('#sModel').value === '__custom__';
@@ -812,19 +1002,161 @@ $('#sModel').addEventListener('change', () => {
 });
 
 $('#settingsForm').addEventListener('submit', () => {
-  settings.selectedModel = $('#sModel').value;
-  settings.customModel = $('#sCustomModel').value.trim();
-  settings.autoSwitch = $('#sAutoSwitch').checked;
-
-  setKey('gemini', $('#sKeyGemini').value.trim());
-  setKey('openrouter', $('#sKeyOpenRouter').value.trim());
-  setKey('groq', $('#sKeyGroq').value.trim());
-
   settings.lang = $('#sLang').value;
   saveSettings();
 });
 
 $('#settingsDlg').addEventListener('close', updateScanState);
+
+/* ---------- star vocab ---------- */
+let vocabSortMode = 'newest';
+let vocabSearchQuery = '';
+
+function renderVocabView() {
+  updateVocabBadge();
+  const el = $('#vocabList');
+  if (!starVocab.length) {
+    el.innerHTML = `
+      <div class="empty">
+        <div class="empty-icon-star">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+        </div>
+        <h2>No Starred Words Yet</h2>
+        <p>Tap the star icon on any word while reading a passage, or tap <strong>+ Add Word</strong> to add words manually.</p>
+      </div>`;
+    return;
+  }
+
+  let list = [...starVocab];
+  const q = vocabSearchQuery.trim().toLowerCase();
+  if (q) {
+    list = list.filter(v =>
+      (v.word && v.word.toLowerCase().includes(q)) ||
+      (v.reading && v.reading.toLowerCase().includes(q)) ||
+      (v.meaning && v.meaning.toLowerCase().includes(q)) ||
+      (v.sentence && v.sentence.toLowerCase().includes(q)) ||
+      (v.translation && v.translation.toLowerCase().includes(q))
+    );
+  }
+
+  if (vocabSortMode === 'alpha') {
+    list.sort((a, b) => (a.reading || a.word).localeCompare(b.reading || b.word, 'ja'));
+  } else {
+    list.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
+  }
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty"><p>No words matched “${esc(q)}”.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = `<div class="vocab-grid">${list.map(v => {
+    const hasSent = !!(v.sentence || v.translation);
+    return `
+      <div class="vocab-card" data-id="${esc(v.id)}">
+        <div class="vc-top">
+          <div class="vc-main-word" lang="ja">
+            ${v.reading ? rubyHTML(v.word, v.reading) : esc(v.word)}
+          </div>
+          <div class="vc-actions">
+            <button type="button" class="btn-icon vc-say" data-say="${esc(v.reading || v.word)}" aria-label="Listen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+            </button>
+            <button type="button" class="btn-icon vc-unstar starred" data-id="${esc(v.id)}" aria-label="Unstar word" title="Remove from Star Vocab">
+              <svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+            </button>
+          </div>
+        </div>
+        <div class="vc-meaning">${esc(v.meaning)}</div>
+        ${hasSent ? `
+          <div class="vc-sent">
+            ${v.sentence ? `<p class="vc-sent-ja" lang="ja">「${esc(v.sentence)}」</p>` : ''}
+            ${v.translation ? `<p class="vc-sent-tr">${esc(v.translation)}</p>` : ''}
+          </div>
+        ` : ''}
+        <div class="vc-foot">
+          ${v.sourceTitle ? `<span class="vc-source" data-pid="${esc(v.sourceId || '')}">${esc(v.sourceTitle)}</span>` : '<span class="vc-source-manual">Manual entry</span>'}
+          <span class="vc-date">${fmtDate(v.addedAt)}</span>
+        </div>
+      </div>`;
+  }).join('')}</div>`;
+
+  $$('.vc-say', el).forEach(btn => {
+    btn.onclick = () => speak(btn.dataset.say);
+  });
+  $$('.vc-unstar', el).forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.id;
+      starVocab = starVocab.filter(x => x.id !== id);
+      saveStarVocab();
+      renderVocabView();
+      if (current) renderReader();
+    };
+  });
+  $$('.vc-source', el).forEach(btn => {
+    btn.onclick = () => {
+      const pid = btn.dataset.pid;
+      if (pid) location.hash = `#/p/${encodeURIComponent(pid)}`;
+    };
+  });
+}
+
+function openAddVocab() {
+  $('#vInWord').value = '';
+  $('#vInReading').value = '';
+  $('#vInMeaning').value = '';
+  $('#vInSentence').value = '';
+  $('#vInSentenceTr').value = '';
+  $('#addVocabDlg').showModal();
+}
+
+$('#openAddVocab')?.addEventListener('click', openAddVocab);
+$('#openAddVocabDesk')?.addEventListener('click', openAddVocab);
+$('#addVocabCancel')?.addEventListener('click', () => $('#addVocabDlg').close());
+
+$('#addVocabForm')?.addEventListener('submit', e => {
+  e.preventDefault();
+  const word = $('#vInWord').value.trim();
+  const meaning = $('#vInMeaning').value.trim();
+  const reading = $('#vInReading').value.trim();
+  const sentence = $('#vInSentence').value.trim();
+  const translation = $('#vInSentenceTr').value.trim();
+
+  if (!word || !meaning) return;
+
+  starVocab.unshift({
+    id: uid(),
+    word,
+    reading,
+    meaning,
+    sentence,
+    translation,
+    sourceTitle: '',
+    sourceId: '',
+    addedAt: Date.now(),
+  });
+  saveStarVocab();
+  updateVocabBadge();
+  $('#addVocabDlg').close();
+  if (lastView === 'vocab') renderVocabView();
+  if (current) renderReader();
+});
+
+$('#vocabSearch')?.addEventListener('input', e => {
+  vocabSearchQuery = e.target.value;
+  renderVocabView();
+});
+
+$('#vocabSortToggle')?.addEventListener('click', () => {
+  vocabSortMode = vocabSortMode === 'newest' ? 'alpha' : 'newest';
+  $('#vocabSortToggle').textContent = vocabSortMode === 'newest' ? 'Newest First' : 'A-Z / Kanji';
+  renderVocabView();
+});
+
+$('#vocabBack')?.addEventListener('click', () => { location.hash = '#/'; });
+$('#openVocab')?.addEventListener('click', () => { location.hash = '#/vocab'; });
 
 /* ---------- scan ---------- */
 let pending = [];
@@ -1045,7 +1377,16 @@ new IntersectionObserver(([e]) => {
 new IntersectionObserver(([e]) => {
   $('#samplesNavTitle').classList.toggle('visible', !e.isIntersecting && !$('#samplesView').hidden);
 }, { rootMargin: '-44px 0px 0px 0px' }).observe($('#samplesLargeTitle'));
+new IntersectionObserver(([e]) => {
+  $('#vocabNavTitle')?.classList.toggle('visible', !e.isIntersecting && !$('#vocabView').hidden);
+}, { rootMargin: '-44px 0px 0px 0px' }).observe($('#vocabLargeTitle'));
 if ('speechSynthesis' in window) speechSynthesis.getVoices();
+
+applyAppearance(settings.appearance);
+applyHighlightColor(settings.highlightColor);
+applyFontFamily(settings.fontFamily);
+applyFontSize(settings.fontSize);
+updateVocabBadge();
 
 window.addEventListener('hashchange', route);
 route();

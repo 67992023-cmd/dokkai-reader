@@ -16,8 +16,12 @@
 <div id="library" class="view">
   <header class="nav">
     <div class="nav-inner">
-      <span></span>
-      <span></span>
+      <button type="button" class="nav-vocab-pill" id="openVocab" aria-label="Open Star Vocab">
+        <svg class="star-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span>Star Vocab</span>
+        <span class="vocab-badge" id="vocabBadge" hidden>0</span>
+      </button>
+      <span class="nav-title" id="libNavTitle">読解 Reader</span>
       <button type="button" class="link" id="openSettings">Settings</button>
     </div>
   </header>
@@ -75,6 +79,44 @@
     </div>
 
     <div id="sampleList"></div>
+  </main>
+</div>
+
+<!-- Star Vocab -->
+<div id="vocabView" class="view" hidden>
+  <header class="nav">
+    <div class="nav-inner">
+      <button type="button" class="link back" id="vocabBack">
+        <svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Library
+      </button>
+      <span class="nav-title" id="vocabNavTitle">Star Vocab</span>
+      <button type="button" class="link strong" id="openAddVocab">+ Add Word</button>
+    </div>
+  </header>
+  <main class="content">
+    <div class="vocab-header">
+      <div>
+        <h1 class="large-title" id="vocabLargeTitle">Star Vocab</h1>
+        <p class="section-desc">Review your saved vocabulary with furigana, Thai meanings, audio pronunciation, and example sentences.</p>
+      </div>
+      <div class="desktop-actions">
+        <button type="button" class="btn primary" id="openAddVocabDesk">+ Add Word</button>
+      </div>
+    </div>
+
+    <div class="vocab-toolbar">
+      <div class="search-wrap">
+        <svg class="search-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8.5" cy="8.5" r="5.5"/><line x1="13" y1="13" x2="18" y2="18"/></svg>
+        <input type="search" id="vocabSearch" placeholder="Search kanji, reading, or Thai meaning…" autocomplete="off" spellcheck="false" aria-label="Search Star Vocab">
+      </div>
+      <div class="vocab-meta-bar">
+        <span class="vocab-total" id="vocabTotalCount">0 words</span>
+        <button type="button" class="chip" id="vocabSortToggle">Newest First</button>
+      </div>
+    </div>
+
+    <div id="vocabList"></div>
   </main>
 </div>
 
@@ -143,6 +185,100 @@
       <button class="link strong" value="save">Done</button>
     </header>
     <div class="sheet-body">
+      <!-- Appearance & Customization -->
+      <div class="group-label">Appearance &amp; Style</div>
+      <div class="group">
+        <!-- Web Appearance -->
+        <div class="field-stacked">
+          <span class="field-label">Web Appearance</span>
+          <div class="segmented segmented-3" role="tablist" aria-label="Web Appearance">
+            <button type="button" class="theme-tab active" data-theme-val="system" role="tab" aria-selected="true">System</button>
+            <button type="button" class="theme-tab" data-theme-val="light" role="tab" aria-selected="false">Light</button>
+            <button type="button" class="theme-tab" data-theme-val="dark" role="tab" aria-selected="false">Dark</button>
+          </div>
+        </div>
+
+        <!-- Highlight Color -->
+        <div class="field-stacked">
+          <div class="field-label-row">
+            <span class="field-label">Reading Highlight Color</span>
+            <span class="field-sublabel" id="hlColorName">Amber</span>
+          </div>
+          <div class="hl-swatches" role="radiogroup" aria-label="Highlight Color">
+            <button type="button" class="hl-swatch active" data-hl-val="amber" role="radio" aria-checked="true" aria-label="Warm Amber" title="Warm Amber"><span class="swatch-dot dot-amber"></span><span>Amber</span></button>
+            <button type="button" class="hl-swatch" data-hl-val="sage" role="radio" aria-checked="false" aria-label="Matcha Sage" title="Matcha Sage"><span class="swatch-dot dot-sage"></span><span>Sage</span></button>
+            <button type="button" class="hl-swatch" data-hl-val="sky" role="radio" aria-checked="false" aria-label="Soft Sky" title="Soft Sky"><span class="swatch-dot dot-sky"></span><span>Sky</span></button>
+            <button type="button" class="hl-swatch" data-hl-val="lavender" role="radio" aria-checked="false" aria-label="Lavender" title="Lavender"><span class="swatch-dot dot-lavender"></span><span>Lavender</span></button>
+            <button type="button" class="hl-swatch" data-hl-val="sakura" role="radio" aria-checked="false" aria-label="Sakura" title="Sakura"><span class="swatch-dot dot-sakura"></span><span>Sakura</span></button>
+          </div>
+        </div>
+
+        <!-- Japanese Font -->
+        <label class="field">
+          <span>Japanese Font</span>
+          <select id="sFontFamily">
+            <option value="mincho">Mincho (明朝体 · Serif)</option>
+            <option value="gothic">Gothic (ゴシック体 · Sans)</option>
+            <option value="rounded">Rounded (丸ゴシック · Friendly)</option>
+          </select>
+        </label>
+
+        <!-- Font Size -->
+        <label class="field">
+          <span>Passage Font Size</span>
+          <select id="sFontSize">
+            <option value="standard">Standard (100%)</option>
+            <option value="large">Large (115%)</option>
+            <option value="xlarge">Extra Large (130%)</option>
+          </select>
+        </label>
+      </div>
+
+      <!-- Intelligence: Grouped AI Models & API Keys -->
+      <div class="group-label">Intelligence</div>
+      <div class="group">
+        <button type="button" class="row-link" id="openAiSettings">
+          <span class="row-main">
+            <span class="row-title">AI Models &amp; API Keys</span>
+            <span class="row-sub" id="sAiSubSummary">Gemini 2.5 Pro · Auto-switch enabled</span>
+          </span>
+          <svg class="chev" viewBox="0 0 8 14" aria-hidden="true"><path d="m1 1 6 6-6 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <p class="group-foot">Configure AI providers (Gemini, Qwen via OpenRouter, Groq), model rankings, and free API keys.</p>
+
+      <!-- Reading Preferences -->
+      <div class="group-label">Reading</div>
+      <div class="group">
+        <label class="field"><span>Meanings In</span>
+          <select id="sLang">
+            <option>Thai</option>
+            <option>English</option>
+            <option>Japanese</option>
+            <option>Chinese</option>
+            <option>Korean</option>
+            <option>Vietnamese</option>
+            <option>Indonesian</option>
+          </select>
+        </label>
+      </div>
+      <p class="group-foot">Applies to passages you scan from now on.</p>
+    </div>
+  </form>
+</dialog>
+
+<!-- AI Models & API Keys Sub-Page Dialog -->
+<dialog id="aiSettingsDlg" class="sheet" aria-labelledby="aiSettingsTitle">
+  <form method="dialog" id="aiSettingsForm">
+    <header class="sheet-head">
+      <button type="button" class="link back" id="aiSettingsBack">
+        <svg viewBox="0 0 12 20" aria-hidden="true"><path d="M10 2 2 10l8 8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Settings
+      </button>
+      <h2 id="aiSettingsTitle" tabindex="-1" autofocus>AI &amp; API Keys</h2>
+      <button class="link strong" value="save">Done</button>
+    </header>
+    <div class="sheet-body">
       <div class="group-label">Model Selection</div>
       <div class="group">
         <label class="field">
@@ -169,7 +305,7 @@
           <input id="sAutoSwitch" type="checkbox" checked>
         </label>
       </div>
-      <p class="group-foot">When enabled, if your top model runs out of free requests (e.g. Gemini 2.5 Pro limit), it automatically switches to the next available backup model.</p>
+      <p class="group-foot">When enabled, if your top model runs out of free requests, it automatically switches to the next available backup model.</p>
 
       <div class="group-label">API Keys</div>
       <div class="group">
@@ -183,22 +319,47 @@
         <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter</a> ·
         <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a>
       </p>
+    </div>
+  </form>
+</dialog>
 
-      <div class="group-label">Reading</div>
+<!-- Add Vocab Dialog -->
+<dialog id="addVocabDlg" class="sheet" aria-labelledby="addVocabTitle">
+  <form id="addVocabForm">
+    <header class="sheet-head">
+      <button type="button" class="link" id="addVocabCancel">Cancel</button>
+      <h2 id="addVocabTitle" tabindex="-1" autofocus>Add Word</h2>
+      <button type="submit" class="link strong" id="addVocabSave">Save</button>
+    </header>
+    <div class="sheet-body">
+      <div class="group-label">Vocabulary Details</div>
       <div class="group">
-        <label class="field"><span>Meanings In</span>
-          <select id="sLang">
-            <option>Thai</option>
-            <option>English</option>
-            <option>Japanese</option>
-            <option>Chinese</option>
-            <option>Korean</option>
-            <option>Vietnamese</option>
-            <option>Indonesian</option>
-          </select>
+        <label class="field">
+          <span>Word *</span>
+          <input type="text" id="vInWord" placeholder="例: 案内, 挑戦" required autocomplete="off" spellcheck="false" lang="ja">
+        </label>
+        <label class="field">
+          <span>Reading</span>
+          <input type="text" id="vInReading" placeholder="例: あんない, ちょうせん" autocomplete="off" spellcheck="false" lang="ja">
+        </label>
+        <label class="field">
+          <span>Thai Meaning *</span>
+          <input type="text" id="vInMeaning" placeholder="例: การแนะนำ, นำทาง" required autocomplete="off">
         </label>
       </div>
-      <p class="group-foot">Applies to passages you scan from now on.</p>
+
+      <div class="group-label">Context Sentence (Optional)</div>
+      <div class="group">
+        <label class="field">
+          <span>Sentence</span>
+          <input type="text" id="vInSentence" placeholder="例: 会場を案内します。" autocomplete="off" spellcheck="false" lang="ja">
+        </label>
+        <label class="field">
+          <span>Sentence Meaning</span>
+          <input type="text" id="vInSentenceTr" placeholder="例: จะนำทางพาชมสถานที่ครับ" autocomplete="off">
+        </label>
+      </div>
+      <p class="group-foot">* Word and Thai Meaning are required. Saved words will appear in your Star Vocab review list.</p>
     </div>
   </form>
 </dialog>
