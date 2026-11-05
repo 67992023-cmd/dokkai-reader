@@ -475,7 +475,18 @@ function route() {
 
   if (passageMatch) {
     const id = decodeURIComponent(passageMatch[1]);
-    const p = passages.find(x => x.id === id || x.sampleId === id);
+    let p = passages.find(x => x.id === id || x.sampleId === id);
+    if (!p && typeof SAMPLES !== 'undefined') {
+      for (const lvl of Object.keys(SAMPLES)) {
+        const found = SAMPLES[lvl].find(x => x.id === id);
+        if (found) {
+          p = makeSampleFromData(found);
+          passages.unshift(p);
+          savePassages();
+          break;
+        }
+      }
+    }
     if (p) {
       current = p;
       showView('reader');
@@ -616,6 +627,8 @@ function renderReader() {
   applyToggles();
   renderQs($('#printedQs'), p.questions, 'p');
   renderQuiz();
+  const ph = $('#wordPlaceholder');
+  if (ph) ph.hidden = false;
 }
 
 function renderQuiz() {
@@ -677,6 +690,8 @@ function selectWord(w) {
 
 function showPanel(t, s, blank) {
   const panel = $('#wordPanel');
+  const ph = $('#wordPlaceholder');
+  if (ph) ph.hidden = true;
   const sentence = s.tokens.map(x => x.t).join('').replace(/【\d+】/g, '');
   panel.innerHTML = `
     <div class="wp-head">
@@ -699,6 +714,8 @@ function showPanel(t, s, blank) {
 
 function closePanel(instant) {
   const panel = $('#wordPanel');
+  const ph = $('#wordPlaceholder');
+  if (ph) ph.hidden = false;
   selected?.classList.remove('on');
   const prev = selected;
   selected = null;
@@ -991,7 +1008,9 @@ $('#quizAdd').onclick = () => {
 /* ---------- wiring ---------- */
 $('#openSettings').onclick = openSettings;
 $('#openScan').onclick = openScan;
+$('#openScanDesk')?.addEventListener('click', openScan);
 $('#openSamples').onclick = () => { location.hash = `#/samples/${activeLevel}`; };
+$('#openSamplesDesk')?.addEventListener('click', () => { location.hash = `#/samples/${activeLevel}`; });
 $('#samplesBack').onclick = () => { location.hash = '#/'; };
 $$('.level-tab').forEach(btn => {
   btn.onclick = () => { location.hash = `#/samples/${btn.dataset.lvl}`; };
