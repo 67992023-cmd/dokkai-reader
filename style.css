@@ -262,8 +262,9 @@ a { color: var(--accent); }
   backdrop-filter: saturate(180%) blur(20px);
 }
 .nav-inner {
+  position: relative;
   max-width: var(--content-max); margin: 0 auto; height: 50px; padding: 0 16px;
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  display: flex; justify-content: space-between; align-items: center;
 }
 #reader .nav-inner {
   max-width: var(--reader-max);
@@ -271,9 +272,11 @@ a { color: var(--accent); }
 .nav-inner > :first-child { justify-self: start; }
 .nav-inner > :last-child { justify-self: end; }
 .nav-title {
-  font-weight: 600; max-width: 52vw;
+  position: absolute; left: 50%; transform: translateX(-50%);
+  font-weight: 600; max-width: 44vw;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   opacity: 0; transition: opacity .2s;
+  pointer-events: none;
 }
 .nav-title.visible { opacity: 1; }
 
@@ -286,19 +289,27 @@ a { color: var(--accent); }
 .link.inline { min-height: 0; padding: 0; display: inline; font-size: inherit; }
 .back svg { width: 12px; height: 20px; }
 
+.nav-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
 /* Star Vocab nav pill */
 .nav-vocab-pill {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   background: var(--fill);
   border: 0;
   border-radius: 99px;
-  padding: 6px 14px;
-  font-size: 14px;
+  padding: 5px 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--label);
   cursor: pointer;
+  white-space: nowrap;
   transition: all .15s ease;
   -webkit-tap-highlight-color: transparent;
 }
