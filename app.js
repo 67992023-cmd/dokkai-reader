@@ -358,7 +358,8 @@ async function executeModelCall({ provider, model, key, images, textPrompt, sche
     'Authorization': `Bearer ${key}`,
   };
   if (isOR) {
-    headers['HTTP-Referer'] = location.origin || 'https://github.com';
+    const origin = (typeof location !== 'undefined' && location.origin && location.origin !== 'null') ? location.origin : 'https://github.com';
+    headers['HTTP-Referer'] = origin;
     headers['X-Title'] = 'Dokkai Reader';
   }
 
@@ -729,9 +730,9 @@ function renderQs(section, list, prefix) {
   section.hidden = !list?.length;
   if (!list?.length) { box.innerHTML = ''; return; }
   box.innerHTML = list.map(q => `
-    <div class="q" id="q-${prefix}-${q.number}">
-      <div class="q-head"><span class="q-num">${q.number}</span>${q.prompt ? `<span class="q-prompt" lang="ja">${esc(q.prompt)}</span>` : ''}</div>
-      <div class="opts" role="group" aria-label="Question ${q.number}">
+    <div class="q" id="q-${esc(prefix)}-${esc(q.number)}">
+      <div class="q-head"><span class="q-num">${esc(q.number)}</span>${q.prompt ? `<span class="q-prompt" lang="ja">${esc(q.prompt)}</span>` : ''}</div>
+      <div class="opts" role="group" aria-label="Question ${esc(q.number)}">
         ${q.options.map((o, i) => `<button type="button" class="opt" data-i="${i}"><span class="opt-n">${i + 1}</span><span class="opt-t" lang="ja">${esc(o)}</span><span class="opt-mark"></span></button>`).join('')}
       </div>
       <p class="ex" hidden>${esc(q.explanation)}</p>
@@ -1192,7 +1193,7 @@ function updateScanState() {
 
 function renderThumbs() {
   $('#thumbs').innerHTML = pending.map((p, i) => `
-    <div class="thumb"><img src="${p.preview}" alt="Photo ${i + 1}">
+    <div class="thumb"><img src="${esc(p.preview)}" alt="Photo ${i + 1}">
       <button type="button" data-i="${i}" aria-label="Remove photo ${i + 1}"><svg viewBox="0 0 10 10" aria-hidden="true"><path d="m1 1 8 8M9 1 1 9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
     </div>`).join('');
   $$('#thumbs button').forEach(b => {

@@ -3,9 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://generativelanguage.googleapis.com https://openrouter.ai https://api.groq.com; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self';">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="読解">
 <title>読解 Reader</title>
 <link rel="stylesheet" href="style.css">
@@ -318,9 +322,9 @@
       </div>
       <p class="group-foot">
         Keys are stored only in this browser and never uploaded. Get free keys:
-        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a> ·
-        <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter</a> ·
-        <a href="https://console.groq.com/keys" target="_blank" rel="noopener">Groq</a>
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio</a> ·
+        <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">OpenRouter</a> ·
+        <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Groq</a>
       </p>
     </div>
   </form>
@@ -402,7 +406,7 @@
             <button type="button" class="btn tinted small" id="copyPrompt">Copy Prompt</button>
           </li>
           <li>In the Gemini app, attach your photos and paste the prompt.
-            <a class="btn tinted small" href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini</a>
+            <a class="btn tinted small" href="https://gemini.google.com/app" target="_blank" rel="noopener noreferrer">Open Gemini</a>
           </li>
           <li>Copy Gemini’s whole reply and paste it here.</li>
         </ol>
@@ -436,7 +440,7 @@
         <button type="button" class="btn tinted small" id="copyQuizPrompt">Copy Prompt</button>
       </li>
       <li>Paste it into the Gemini app.
-        <a class="btn tinted small" href="https://gemini.google.com/app" target="_blank" rel="noopener">Open Gemini</a>
+        <a class="btn tinted small" href="https://gemini.google.com/app" target="_blank" rel="noopener noreferrer">Open Gemini</a>
       </li>
       <li>Copy Gemini’s whole reply and paste it here.</li>
     </ol>
