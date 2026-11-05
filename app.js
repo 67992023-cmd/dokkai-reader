@@ -408,13 +408,21 @@ function makeSampleFromData(data) {
       tokens: rawTokens,
     };
   });
-  const questions = (Q || []).map(([number, options, answer, explanation]) => ({
-    number,
-    prompt: '',
-    options,
-    answer,
-    explanation,
-  }));
+  const questions = (Q || []).map(q => {
+    if (Array.isArray(q)) {
+      if (q.length >= 5) {
+        return { number: q[0], prompt: String(q[1] || ''), options: q[2], answer: q[3], explanation: q[4] };
+      }
+      return { number: q[0], prompt: '', options: q[1], answer: q[2], explanation: q[3] };
+    }
+    return {
+      number: q.number,
+      prompt: String(q.prompt || ''),
+      options: q.options || [],
+      answer: q.answer || 0,
+      explanation: q.explanation || '',
+    };
+  });
   return {
     id: id || uid(),
     created: Date.now(),
@@ -440,6 +448,12 @@ function openSamplePassage(data) {
     p = makeSampleFromData(data);
     passages.unshift(p);
     savePassages();
+  } else {
+    const fresh = makeSampleFromData(data);
+    if (fresh.questions?.length && (!p.questions?.length || !p.questions[0].prompt)) {
+      p.questions = fresh.questions;
+      savePassages();
+    }
   }
   lastView = 'samples';
   openReader(p.id);

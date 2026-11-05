@@ -250,8 +250,8 @@ rt { font-family: var(--font); font-size: .5em; color: var(--label2); }
 .q { background: var(--surface); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; transition: box-shadow .3s; }
 .q.flash { box-shadow: 0 0 0 3px var(--accent); }
 .q-head { display: flex; gap: 10px; align-items: baseline; margin-bottom: 12px; }
-.q-num { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; }
-.q-prompt { font-family: var(--font-jp); }
+.q-num { font-weight: 700; color: var(--accent); font-size: 17px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.q-prompt { font-family: var(--font-jp); font-size: 17px; line-height: 1.5; color: var(--label); font-weight: 500; }
 .opts { display: flex; flex-direction: column; gap: 8px; }
 .opt {
   display: flex; align-items: center; gap: 12px; width: 100%; min-height: 48px;
