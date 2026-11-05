@@ -257,6 +257,22 @@ dialog::backdrop { background: rgba(0, 0, 0, .4); }
   flex: 1; min-width: 0; border: 0; background: transparent; outline: none;
   padding: 12px 0; text-align: right; text-align-last: right; color: var(--label2);
 }
+.toggle-field {
+  display: flex; align-items: center; justify-content: space-between;
+  min-height: 48px; padding: 0 16px;
+}
+.toggle-field input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none; width: 51px; height: 31px;
+  border-radius: 16px; background: var(--fill); position: relative;
+  outline: none; cursor: pointer; transition: background-color .2s; flex: none; margin: 0;
+}
+.toggle-field input[type="checkbox"]:checked { background: var(--ok); }
+.toggle-field input[type="checkbox"]::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px;
+  border-radius: 50%; background: #ffffff; box-shadow: 0 2px 4px rgba(0, 0, 0, .2);
+  transition: transform .2s cubic-bezier(.34, 1.56, .64, 1);
+}
+.toggle-field input[type="checkbox"]:checked::after { transform: translateX(20px); }
 .group-foot { font-size: 13px; color: var(--label2); margin: 8px 16px 0; line-height: 1.45; }
 .group-foot:empty { display: none; }
 

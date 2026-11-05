@@ -19,61 +19,55 @@ function save(key, value) {
   catch { alert('Browser storage is full. Delete a few passages and try again.'); return false; }
 }
 
-/* ---------- state & providers ---------- */
-const PROVIDERS = {
-  gemini: {
-    name: 'Google Gemini',
-    keyName: 'API key',
-    keySite: 'Google AI Studio',
-    keyUrl: 'https://aistudio.google.com/apikey',
-    defaultModel: 'gemini-2.5-flash',
-    defaultModels: [
-      { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash (Recommended · Fast & Free)' },
-      { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro (Flagship · Free 50/day)' },
-      { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash (Next-gen fast)' },
-      { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite (Lightweight)' },
-      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Stable)' },
-      { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Deep reasoning)' },
-    ],
+/* ---------- state & model ranking ---------- */
+const MODEL_RANKING = [
+  {
+    id: 'gemini:gemini-2.5-pro',
+    provider: 'gemini',
+    model: 'gemini-2.5-pro',
+    name: 'Gemini 2.5 Pro',
+    rank: 1,
+    desc: 'Best accuracy for JLPT N3 & Thai translation',
   },
-  openrouter: {
-    name: 'OpenRouter',
-    keyName: 'API key',
-    keySite: 'OpenRouter',
-    keyUrl: 'https://openrouter.ai/keys',
-    defaultModel: 'qwen/qwen-2.5-vl-72b-instruct:free',
-    defaultModels: [
-      { id: 'qwen/qwen-2.5-vl-72b-instruct:free', name: 'Qwen 2.5 VL 72B (Free · Top Open Vision)' },
-      { id: 'google/gemma-4-31b-it:free', name: 'Google Gemma 4 31B (Free · Multimodal)' },
-      { id: 'meta-llama/llama-3.2-11b-vision-instruct:free', name: 'Llama 3.2 11B Vision (Free)' },
-      { id: 'nvidia/nemotron-3.5-super-vl:free', name: 'Nemotron 3.5 Super VL (Free)' },
-      { id: 'google/gemini-2.0-flash-exp:free', name: 'Gemini 2.0 Flash Exp (Free)' },
-      { id: 'qwen/qwen-2.5-vl-72b-instruct', name: 'Qwen 2.5 VL 72B (Paid endpoint)' },
-    ],
+  {
+    id: 'gemini:gemini-2.5-flash',
+    provider: 'gemini',
+    model: 'gemini-2.5-flash',
+    name: 'Gemini 2.5 Flash',
+    rank: 2,
+    desc: 'Fast & high quota (1500 req/day)',
   },
-  groq: {
-    name: 'Groq',
-    keyName: 'API key',
-    keySite: 'Groq Console',
-    keyUrl: 'https://console.groq.com/keys',
-    defaultModel: 'llama-3.2-11b-vision-preview',
-    defaultModels: [
-      { id: 'llama-3.2-11b-vision-preview', name: 'Llama 3.2 11B Vision (Free · Ultra-fast)' },
-      { id: 'llama-3.2-90b-vision-preview', name: 'Llama 3.2 90B Vision (Free · Large)' },
-    ],
+  {
+    id: 'openrouter:qwen/qwen-2.5-vl-72b-instruct:free',
+    provider: 'openrouter',
+    model: 'qwen/qwen-2.5-vl-72b-instruct:free',
+    name: 'Qwen 2.5 VL 72B',
+    rank: 3,
+    desc: 'Top Chinese open-source vision model',
   },
-};
+  {
+    id: 'openrouter:google/gemma-4-31b-it:free',
+    provider: 'openrouter',
+    model: 'google/gemma-4-31b-it:free',
+    name: 'Gemma 4 31B',
+    rank: 4,
+    desc: 'Free open multimodal model',
+  },
+  {
+    id: 'groq:llama-3.2-11b-vision-preview',
+    provider: 'groq',
+    model: 'llama-3.2-11b-vision-preview',
+    name: 'Llama 3.2 11B Vision',
+    rank: 5,
+    desc: 'Ultra-fast fallback',
+  },
+];
 
 const DEFAULTS = {
-  provider: 'gemini',
+  selectedModel: 'auto',
+  autoSwitch: true,
+  customModel: '',
   keys: { gemini: '', openrouter: '', groq: '' },
-  models: {
-    gemini: 'gemini-2.5-flash',
-    openrouter: 'qwen/qwen-2.5-vl-72b-instruct:free',
-    groq: 'llama-3.2-11b-vision-preview',
-  },
-  customModels: { gemini: '', openrouter: '', groq: '' },
-  providerModels: { gemini: [], openrouter: [], groq: [] },
   lang: 'Thai',
 };
 
@@ -81,17 +75,15 @@ const rawSettings = load('settings', {});
 if (rawSettings.apiKey && (!rawSettings.keys || !rawSettings.keys.gemini)) {
   rawSettings.keys = { ...DEFAULTS.keys, ...(rawSettings.keys || {}), gemini: rawSettings.apiKey };
 }
-if (rawSettings.model && (!rawSettings.models || !rawSettings.models.gemini)) {
-  rawSettings.models = { ...DEFAULTS.models, ...(rawSettings.models || {}), gemini: rawSettings.model };
+if (!rawSettings.selectedModel) {
+  if (rawSettings.model) rawSettings.selectedModel = `gemini:${rawSettings.model}`;
+  else rawSettings.selectedModel = 'auto';
 }
 
 const settings = {
   ...DEFAULTS,
   ...rawSettings,
   keys: { ...DEFAULTS.keys, ...(rawSettings.keys || {}) },
-  models: { ...DEFAULTS.models, ...(rawSettings.models || {}) },
-  customModels: { ...DEFAULTS.customModels, ...(rawSettings.customModels || {}) },
-  providerModels: { ...DEFAULTS.providerModels, ...(rawSettings.providerModels || {}) },
 };
 const ui = { furi: true, tr: false, mode: '', ...load('ui', {}) };
 let passages = load('passages', []);
@@ -102,20 +94,57 @@ const savePassages = () => save('passages', passages);
 const saveSettings = () => save('settings', settings);
 const saveUi = () => save('ui', ui);
 
-const getProvider = () => settings.provider || 'gemini';
-const getKey = (p = getProvider()) => (settings.keys && settings.keys[p]) || (p === 'gemini' ? (settings.apiKey || '') : '');
-const setKey = (p, k) => {
+const getKey = prov => (settings.keys && settings.keys[prov]) || (prov === 'gemini' ? (settings.apiKey || '') : '');
+const setKey = (prov, val) => {
   if (!settings.keys) settings.keys = {};
-  settings.keys[p] = k;
-  if (p === 'gemini') settings.apiKey = k;
+  settings.keys[prov] = val;
+  if (prov === 'gemini') settings.apiKey = val;
 };
-const getActiveModel = (p = getProvider()) => {
-  const chosen = (settings.models && settings.models[p]) || PROVIDERS[p]?.defaultModel;
+
+function parseModelSpec(spec) {
+  if (!spec || spec === 'auto') return null;
+  const idx = spec.indexOf(':');
+  if (idx > 0) return { provider: spec.slice(0, idx), model: spec.slice(idx + 1) };
+  return { provider: 'gemini', model: spec };
+}
+
+function getExecutionQueue() {
+  const chosen = settings.selectedModel || 'auto';
+  const autoSwitch = settings.autoSwitch !== false;
+  const availableKeys = {
+    gemini: getKey('gemini'),
+    openrouter: getKey('openrouter'),
+    groq: getKey('groq'),
+  };
+
   if (chosen === '__custom__') {
-    return (settings.customModels && settings.customModels[p]) || '';
+    const custom = parseModelSpec(settings.customModel);
+    if (custom && availableKeys[custom.provider]) {
+      return [{ ...custom, name: custom.model, id: `custom:${custom.model}` }];
+    }
+    return [];
   }
-  return chosen;
-};
+
+  const availableRanked = MODEL_RANKING.filter(m => Boolean(availableKeys[m.provider]));
+
+  if (chosen === 'auto') {
+    return availableRanked;
+  }
+
+  const specific = MODEL_RANKING.find(m => m.id === chosen) || parseModelSpec(chosen);
+  if (!specific) return availableRanked;
+
+  if (!autoSwitch) {
+    return availableKeys[specific.provider] ? [specific] : [];
+  }
+
+  const queue = [];
+  if (availableKeys[specific.provider]) queue.push(specific);
+  for (const m of availableRanked) {
+    if (!queue.some(q => q.id === m.id)) queue.push(m);
+  }
+  return queue;
+}
 
 /* ---------- prompts and schemas ---------- */
 const Q_SCHEMA = {
@@ -199,20 +228,19 @@ Reply with only one JSON object in a code block, no other text, in exactly this 
 {"questions":[{"number":1,"prompt":"...","options":["...","...","...","..."],"answer":0,"explanation":"..."}]}` : ''}`;
 }
 
-/* ---------- AI Providers & API ---------- */
+/* ---------- AI Calling & Fallback ---------- */
 const API = 'https://generativelanguage.googleapis.com/v1beta';
 
-function friendlyError(status, err) {
+function friendlyError(status, err, modelName = 'AI') {
   const msg = typeof err === 'string' ? err : err?.message || '';
-  const prov = PROVIDERS[getProvider()]?.name || 'AI service';
-  if ((status === 400 && /api key/i.test(msg)) || status === 401 || status === 403) return `${prov} didn’t accept the API key. Check it in Settings.`;
-  if (status === 404) return `The model “${getActiveModel()}” isn’t available on ${prov}. Choose another model in Settings.`;
-  if (status === 429) return `You’ve reached the free limit for ${prov}. Wait a minute and try again, or switch models in Settings.`;
-  if (status >= 500) return `${prov} is busy right now. Try again in a moment.`;
+  if ((status === 400 && /api key/i.test(msg)) || status === 401 || status === 403) return `${modelName} didn’t accept the API key. Check it in Settings.`;
+  if (status === 404) return `The model “${modelName}” is not available.`;
+  if (status === 429) return `Rate limit reached for ${modelName}.`;
+  if (status >= 500) return `${modelName} is busy right now.`;
   return msg || `The request failed (${status}).`;
 }
 
-async function apiFetch(url, opts = {}) {
+async function apiFetch(url, opts = {}, modelName = 'AI') {
   let res;
   try { res = await fetch(url, opts); }
   catch (e) {
@@ -220,20 +248,12 @@ async function apiFetch(url, opts = {}) {
     throw new Error('Couldn’t reach the AI service. Check your internet connection.');
   }
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(friendlyError(res.status, data?.error?.message || data?.error));
+  if (!res.ok) throw new Error(friendlyError(res.status, data?.error?.message || data?.error, modelName));
   return data;
 }
 
-async function callAI({ images = [], textPrompt, schema, signal }) {
-  const provId = getProvider();
-  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
-  const key = getKey(provId);
-  const model = getActiveModel(provId);
-
-  if (!key) throw new Error(`Please add your ${prov.name} API key in Settings.`);
-  if (!model) throw new Error(`Please select or enter a model in Settings.`);
-
-  if (provId === 'gemini') {
+async function executeModelCall({ provider, model, key, images, textPrompt, schema, signal }) {
+  if (provider === 'gemini') {
     const parts = images.map(p => ({ inline_data: { mime_type: p.mime, data: p.data } }));
     parts.push({ text: textPrompt });
     const data = await apiFetch(`${API}/models/${encodeURIComponent(model)}:generateContent`, {
@@ -247,7 +267,7 @@ async function callAI({ images = [], textPrompt, schema, signal }) {
           ...(schema ? { responseSchema: schema } : {}),
         },
       }),
-    });
+    }, model);
     const cand = data.candidates?.[0];
     const text = (cand?.content?.parts || []).map(p => p.text || '').join('');
     if (cand?.finishReason === 'MAX_TOKENS') throw new Error('The passage is too long for one scan. Try fewer photos at a time.');
@@ -256,7 +276,7 @@ async function callAI({ images = [], textPrompt, schema, signal }) {
   }
 
   // OpenAI-compatible (OpenRouter or Groq)
-  const isOR = provId === 'openrouter';
+  const isOR = provider === 'openrouter';
   const endpoint = isOR
     ? 'https://openrouter.ai/api/v1/chat/completions'
     : 'https://api.groq.com/openai/v1/chat/completions';
@@ -288,53 +308,48 @@ async function callAI({ images = [], textPrompt, schema, signal }) {
       messages: [{ role: 'user', content }],
       response_format: { type: 'json_object' },
     }),
-  });
+  }, model);
 
   const cand = data.choices?.[0]?.message?.content;
-  if (!cand) throw new Error(`${prov.name} returned an empty answer. Try again.`);
+  if (!cand) throw new Error(`Model ${model} returned an empty answer. Try again.`);
   return parseJSON(cand);
 }
 
-const ver = n => { const m = n.match(/^gemini-(\d+(?:\.\d+)?)/); return m ? parseFloat(m[1]) : 0; };
-async function refreshModels() {
-  const provId = getProvider();
-  const prov = PROVIDERS[provId];
-  const key = getKey(provId);
-
-  if (provId === 'gemini') {
-    if (!key) throw new Error('Enter a Google AI Studio API key first.');
-    const data = await apiFetch(`${API}/models?pageSize=1000`, { headers: { 'x-goog-api-key': key } });
-    const names = (data.models || [])
-      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-      .map(m => m.name.replace(/^models\//, ''))
-      .filter(n => /^gemini-/.test(n) && !/(tts|image|embedding|audio|live|robotics|computer-use)/.test(n));
-    const sorted = [...new Set(names)].sort((a, b) => ver(b) - ver(a) || a.localeCompare(b));
-    settings.providerModels.gemini = sorted.map(id => ({ id, name: id }));
-  } else if (provId === 'openrouter') {
-    const res = await apiFetch('https://openrouter.ai/api/v1/models');
-    const list = res.data || [];
-    const freeOrVision = list.filter(m => {
-      const isFree = m.id?.includes(':free');
-      const mod = m.architecture?.modality || '';
-      return isFree || mod.includes('image');
-    }).map(m => ({
-      id: m.id,
-      name: `${m.name || m.id}${m.id.includes(':free') ? ' (Free)' : ''}`,
-      free: m.id.includes(':free'),
-    })).sort((a, b) => (b.free - a.free) || a.name.localeCompare(b.name));
-    settings.providerModels.openrouter = freeOrVision.slice(0, 30);
-  } else if (provId === 'groq') {
-    if (!key) throw new Error('Enter a Groq API key first.');
-    const res = await apiFetch('https://api.groq.com/openai/v1/models', {
-      headers: { Authorization: `Bearer ${key}` },
-    });
-    const list = (res.data || [])
-      .filter(m => /vision|llama/i.test(m.id))
-      .map(m => ({ id: m.id, name: m.id }));
-    settings.providerModels.groq = list;
+async function callAIWithFallback({ images = [], textPrompt, schema, signal, onSwitch }) {
+  const queue = getExecutionQueue();
+  if (!queue.length) {
+    throw new Error('No API key configured for the selected model. Please add a key in Settings.');
   }
-  saveSettings();
-  return (settings.providerModels[provId] || []).length;
+
+  let lastError = null;
+  for (let i = 0; i < queue.length; i++) {
+    const item = queue[i];
+    const key = getKey(item.provider);
+    try {
+      if (i > 0 && onSwitch) {
+        onSwitch(item, queue[i - 1], lastError);
+      }
+      return await executeModelCall({
+        provider: item.provider,
+        model: item.model,
+        key,
+        images,
+        textPrompt: item.provider === 'gemini' ? textPrompt : manualPassagePrompt(settings.lang),
+        schema,
+        signal,
+      });
+    } catch (err) {
+      if (err.name === 'AbortError') throw err;
+      lastError = err;
+      const isRecoverable = /quota|limit|429|500|503|overloaded|busy/i.test(err.message);
+      if (i < queue.length - 1 && isRecoverable) {
+        console.warn(`Model ${item.name || item.model} reached limit (${err.message}). Auto-switching to ${queue[i + 1].name}...`);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw lastError || new Error('All models in fallback queue failed.');
 }
 
 /* ---------- parsing and normalising ---------- */
@@ -583,18 +598,23 @@ function speak(text) {
 /* quiz */
 async function autoQuiz() {
   const p = current, st = $('#quizStatus'), btn = $('#mkQuiz');
+  const queue = getExecutionQueue();
+  const topModel = queue[0]?.name || 'AI';
+
   $('#quizSec').hidden = false;
   st.hidden = false;
   st.classList.remove('err');
-  st.textContent = `Writing questions using ${getActiveModel()}…`;
+  st.textContent = `Writing questions using ${topModel}…`;
   btn.disabled = true;
   st.scrollIntoView({ behavior: smooth(), block: 'center' });
   try {
-    const isGemini = getProvider() === 'gemini';
-    const out = await callAI({
+    const out = await callAIWithFallback({
       images: [],
-      textPrompt: quizPrompt(p, !isGemini),
+      textPrompt: quizPrompt(p, false),
       schema: QUIZ_SCHEMA,
+      onSwitch: (nextItem, prevItem) => {
+        st.textContent = `${prevItem.name} limit reached. Switching to ${nextItem.name}…`;
+      },
     });
     const quiz = normQs(out.questions);
     if (!quiz.length) throw new Error('The AI didn’t return any questions. Try again.');
@@ -629,47 +649,19 @@ async function copyText(text, btn) {
 }
 
 /* ---------- settings ---------- */
-function getModelList(provId) {
-  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
-  const fetched = settings.providerModels?.[provId];
-  if (fetched && fetched.length) return fetched;
-  return prov.defaultModels;
-}
-
-function updateSettingsForm() {
-  const provId = $('#sProvider').value;
-  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
-
-  $('#sKeyLabel').textContent = `${prov.name} Key`;
-  $('#sKey').placeholder = `Paste your ${prov.keyName}`;
-  $('#sKey').value = getKey(provId);
-
-  const models = getModelList(provId);
-  const currentChosen = settings.models?.[provId] || prov.defaultModel;
-  const isCustom = currentChosen === '__custom__' || (!models.some(m => m.id === currentChosen) && Boolean(settings.customModels?.[provId]));
-
-  let opts = models.map(m => `<option value="${esc(m.id)}"${!isCustom && m.id === currentChosen ? ' selected' : ''}>${esc(m.name)}</option>`).join('');
-  opts += `<option value="__custom__"${isCustom ? ' selected' : ''}>Custom Model ID…</option>`;
-  $('#sModel').innerHTML = opts;
-
-  $('#sCustomField').hidden = !isCustom;
-  $('#sCustomModel').value = settings.customModels?.[provId] || (isCustom ? currentChosen : '');
-
-  $('#sFootText').innerHTML = `Get a free key at <a href="${prov.keyUrl}" target="_blank" rel="noopener">${prov.keySite}</a>. The key is saved only in this browser and never uploaded.`;
-}
-
 function openSettings() {
-  $('#sProvider').value = getProvider();
+  $('#sModel').value = settings.selectedModel || 'auto';
+  $('#sCustomField').hidden = settings.selectedModel !== '__custom__';
+  $('#sCustomModel').value = settings.customModel || '';
+  $('#sAutoSwitch').checked = settings.autoSwitch !== false;
+
+  $('#sKeyGemini').value = getKey('gemini');
+  $('#sKeyOpenRouter').value = getKey('openrouter');
+  $('#sKeyGroq').value = getKey('groq');
+
   $('#sLang').value = settings.lang || 'Thai';
-  $('#sStatus').textContent = '';
-  updateSettingsForm();
   $('#settingsDlg').showModal();
 }
-
-$('#sProvider').addEventListener('change', () => {
-  settings.provider = $('#sProvider').value;
-  updateSettingsForm();
-});
 
 $('#sModel').addEventListener('change', () => {
   const isCustom = $('#sModel').value === '__custom__';
@@ -678,44 +670,17 @@ $('#sModel').addEventListener('change', () => {
 });
 
 $('#settingsForm').addEventListener('submit', () => {
-  const provId = $('#sProvider').value;
-  const key = $('#sKey').value.trim();
-  const prevKey = getKey(provId);
-  setKey(provId, key);
+  settings.selectedModel = $('#sModel').value;
+  settings.customModel = $('#sCustomModel').value.trim();
+  settings.autoSwitch = $('#sAutoSwitch').checked;
 
-  settings.provider = provId;
-  const selectedModel = $('#sModel').value;
-  if (selectedModel === '__custom__') {
-    settings.models[provId] = '__custom__';
-    settings.customModels[provId] = $('#sCustomModel').value.trim();
-  } else {
-    settings.models[provId] = selectedModel;
-  }
+  setKey('gemini', $('#sKeyGemini').value.trim());
+  setKey('openrouter', $('#sKeyOpenRouter').value.trim());
+  setKey('groq', $('#sKeyGroq').value.trim());
+
   settings.lang = $('#sLang').value;
   saveSettings();
-
-  if (key && key !== prevKey && provId === 'gemini') {
-    refreshModels().catch(() => {});
-  }
 });
-
-$('#sRefresh').onclick = async () => {
-  const provId = $('#sProvider').value;
-  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
-  const key = $('#sKey').value.trim();
-  setKey(provId, key);
-  saveSettings();
-
-  const st = $('#sStatus');
-  st.textContent = `Loading models from ${prov.name}…`;
-  try {
-    const count = await refreshModels();
-    updateSettingsForm();
-    st.textContent = `Found ${count} models for ${prov.name}.`;
-  } catch (e) {
-    st.textContent = e.message;
-  }
-};
 
 $('#settingsDlg').addEventListener('close', updateScanState);
 
@@ -737,17 +702,17 @@ function setMode(mode) {
 }
 
 function updateScanState() {
-  const provId = getProvider();
-  const prov = PROVIDERS[provId] || PROVIDERS.gemini;
-  const key = getKey(provId);
-  const model = getActiveModel(provId);
-  const hasKey = Boolean(key && model);
+  const queue = getExecutionQueue();
+  const hasValid = queue.length > 0;
 
-  $('#noKey').hidden = hasKey;
-  if (!hasKey) {
-    $('#noKeyText').textContent = `Automatic needs a free ${prov.name} API key.`;
+  $('#noKey').hidden = hasValid;
+  if (!hasValid) {
+    const chosen = settings.selectedModel || 'auto';
+    $('#noKeyText').textContent = chosen === 'auto'
+      ? 'Automatic needs an API key. Add Google Gemini or OpenRouter in Settings.'
+      : 'Automatic needs an API key for the selected model. Add it in Settings.';
   }
-  $('#createAuto').disabled = !hasKey || !pending.length;
+  $('#createAuto').disabled = !hasValid || !pending.length;
   $('#createManual').disabled = !$('#pasteIn').value.trim();
 }
 
@@ -838,13 +803,14 @@ $('#createAuto').onclick = async () => {
   setBusy(true);
   abortCtl = new AbortController();
   try {
-    const isGemini = getProvider() === 'gemini';
-    const textPrompt = isGemini ? passagePrompt(settings.lang) : manualPassagePrompt(settings.lang);
-    const out = await callAI({
+    const out = await callAIWithFallback({
       images: pending,
-      textPrompt,
+      textPrompt: passagePrompt(settings.lang),
       schema: PASSAGE_SCHEMA,
       signal: abortCtl.signal,
+      onSwitch: (nextItem, prevItem) => {
+        $('#busyText').textContent = `${prevItem.name || 'Model'} limit reached. Auto-switching to ${nextItem.name}…`;
+      },
     });
     setBusy(false);
     finishPassage(out);
@@ -911,7 +877,7 @@ $('#passage').addEventListener('keydown', e => {
 });
 $('#tgFuri').onclick = () => { ui.furi = !ui.furi; saveUi(); applyToggles(); };
 $('#tgTr').onclick = () => { ui.tr = !ui.tr; saveUi(); applyToggles(); };
-$('#mkQuiz').onclick = () => (getKey() ? autoQuiz() : openQuizDlg());
+$('#mkQuiz').onclick = () => (getExecutionQueue().length > 0 ? autoQuiz() : openQuizDlg());
 $('#delPassage').onclick = () => {
   if (!confirm(`Delete “${current.title}”? This can’t be undone.`)) return;
   passages = passages.filter(p => p !== current);
